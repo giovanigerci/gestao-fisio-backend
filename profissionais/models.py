@@ -7,6 +7,9 @@ class Profissional(models.Model):
     especialidade = models.CharField(max_length=100)
     crefito = models.CharField(max_length=15, unique=True)
 
+    class Meta:
+        verbose_name = 'Profissional'
+        verbose_name_plural = 'Profissionais'
 
     def __str__(self):
         return self.usuario.get_full_name() or self.usuario.username
