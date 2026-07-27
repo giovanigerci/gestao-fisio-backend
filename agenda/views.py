@@ -3,5 +3,8 @@ from .models import Agendamento
 from .serializers import AgendamentoSerializer
 
 class AgendamentoViewSet(viewsets.ModelViewSet):
-    queryset = Agendamento.objects.all()
     serializer_class = AgendamentoSerializer
+
+    def get_queryset(self):
+        return Agendamento.objects.filter(profissional=self.request.user.profissional)
+    
