@@ -3,5 +3,8 @@ from .models import Paciente
 from .serializers import PacienteSerializer
 
 class PacienteViewSet(viewsets.ModelViewSet):
-    queryset = Paciente.objects.all()
     serializer_class = PacienteSerializer
+    
+    def get_queryset(self):
+        return Paciente.objects.filter(profissional=self.request.user.profissional)
+    
