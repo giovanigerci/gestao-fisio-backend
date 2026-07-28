@@ -1,5 +1,4 @@
 from django.contrib import admin
-from .models import Clinica, VinculoClinica
+from .models import Clinica
 
 admin.site.register(Clinica)
-admin.site.register(VinculoClinica)
