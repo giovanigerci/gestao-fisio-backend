@@ -8,6 +8,7 @@ class AgendamentoSerializer(serializers.ModelSerializer):
         model = Agendamento
         fields = ['id', 'profissional', 'clinica', 'paciente', 'data', 'hora_inicio',
                    'hora_fim', 'status', 'eh_experimental', 'eh_gratuito', 'valor_calculado']
+        read_only_fields = ['profissional']
 
     def get_valor_calculado(self, obj):
         if obj.eh_gratuito:
