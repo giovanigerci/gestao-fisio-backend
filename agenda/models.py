@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from clinicas.models import Clinica
 from pacientes.models import Paciente
 from profissionais.models import Profissional
@@ -18,6 +19,15 @@ class Agendamento(models.Model):
     status = models.CharField(max_length=2, choices=Status.choices, default=Status.AGENDADO)
     eh_experimental = models.BooleanField(default=False)
     eh_gratuito = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['paciente', 'data', 'hora_inicio'],
+                condition=~Q(status='CA'),
+                name='paciente_sem_conflito_agendamento',
+            )
+        ]
 
     def __str__(self):
         return f"{self.paciente} - {self.data} {self.hora_inicio}"
