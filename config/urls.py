@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from profissionais.views_auth import LoginCookieView, RefreshCookieView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -9,6 +9,6 @@ urlpatterns = [
     path('api/', include('pacientes.urls')),
     path('api/', include('financeiro.urls')),
     path('api/auth/', include('profissionais.urls')),
-    path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/auth/token/', LoginCookieView.as_view(), name='token_obtain_pair'),
+    path('api/auth/token/refresh/', RefreshCookieView.as_view(), name='token_refresh'),
 ]
