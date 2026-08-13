@@ -2,6 +2,7 @@ import random
 from datetime import date, timedelta, time
 
 from django.core.management.base import BaseCommand
+from django.db import IntegrityError
 
 from profissionais.models import Profissional
 from clinicas.models import Clinica
@@ -76,31 +77,36 @@ class Command(BaseCommand):
         # Cria 40 agendamentos espalhados em ±14 dias a partir de hoje
         hoje = date.today()
         criados = 0
-        for _ in range(40):
+        tentativas = 0
+        max_tentativas = 200
+
+        while criados < 40 and tentativas < max_tentativas:
+            tentativas += 1
             dias_offset = random.randint(-14, 14)
             data_agendamento = hoje + timedelta(days=dias_offset)
             hora_inicio = random.choice(HORARIOS)
             hora_fim = time(hora_inicio.hour + 1, 0)
 
             eh_experimental = random.random() < 0.2
-            eh_gratuito = eh_experimental and random.random() < 0.5
 
             if dias_offset < 0:
                 status = random.choice(["RE", "RE", "CA"])
             else:
                 status = "AG"
 
-            Agendamento.objects.create(
-                profissional=profissional,
-                clinica=random.choice(clinicas),
-                paciente=random.choice(pacientes),
-                data=data_agendamento,
-                hora_inicio=hora_inicio,
-                hora_fim=hora_fim,
-                status=status,
-                eh_experimental=eh_experimental,
-                eh_gratuito=eh_gratuito,
-            )
-            criados += 1
+            try:
+                Agendamento.objects.create(
+                    profissional=profissional,
+                    clinica=random.choice(clinicas),
+                    paciente=random.choice(pacientes),
+                    data=data_agendamento,
+                    hora_inicio=hora_inicio,
+                    hora_fim=hora_fim,
+                    status=status,
+                    eh_experimental=eh_experimental,
+                )
+                criados += 1
+            except IntegrityError:
+                continue
 
         self.stdout.write(self.style.SUCCESS(f"{criados} agendamentos criados."))
