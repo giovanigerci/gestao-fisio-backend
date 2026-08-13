@@ -7,11 +7,11 @@ class AgendamentoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Agendamento
         fields = ['id', 'profissional', 'clinica', 'paciente', 'data', 'hora_inicio',
-                   'hora_fim', 'status', 'eh_experimental', 'eh_gratuito', 'valor_calculado']
+                   'hora_fim', 'status', 'eh_experimental', 'valor_calculado']
         read_only_fields = ['profissional']
 
     def get_valor_calculado(self, obj):
-        if obj.eh_gratuito:
+        if obj.eh_experimental:
             return 0
         return obj.clinica.valor_por_atendimento
 

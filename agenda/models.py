@@ -18,7 +18,6 @@ class Agendamento(models.Model):
     hora_fim = models.TimeField()
     status = models.CharField(max_length=2, choices=Status.choices, default=Status.AGENDADO)
     eh_experimental = models.BooleanField(default=False)
-    eh_gratuito = models.BooleanField(default=False)
 
     class Meta:
         constraints = [
