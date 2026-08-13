@@ -19,7 +19,7 @@ class ResumoFinanceiroView(APIView):
             fim = hoje.replace(day=ultimo_dia)
 
         agendamentos = Agendamento.objects.filter(
-            eh_gratuito=False,
+            eh_experimental=False,
             profissional=request.user.profissional,
             data__gte=inicio,
             data__lte=fim,
