@@ -1,6 +1,8 @@
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.permissions import IsAuthenticated
 
 
 class LoginCookieView(TokenObtainPairView):
@@ -58,4 +60,13 @@ class RefreshCookieView(TokenRefreshView):
             path='/api/',
         )
 
+        return response
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        response = Response({'detail': 'Logout realizado com sucesso.'})
+        response.delete_cookie('access_token', path='/api/')
+        response.delete_cookie('refresh_token', path='/api/auth/token/refresh/')
         return response
