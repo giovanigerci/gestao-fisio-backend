@@ -8,7 +8,12 @@ from agenda.models import Agendamento
 class ResumoFinanceiroView(APIView):
     def get(self, request):
         periodo = request.query_params.get('periodo', 'mes')
-        hoje = date.today()
+        data_str = request.query_params.get('data')
+        
+        if data_str:
+            hoje = date.fromisoformat(data_str)
+        else:
+            hoje = date.today()
 
         if periodo == 'semana':
             inicio = hoje - timedelta(days=hoje.weekday())
