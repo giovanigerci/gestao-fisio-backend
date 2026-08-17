@@ -18,10 +18,12 @@ class AgendamentoSerializer(serializers.ModelSerializer):
     def validate(self, dados):
         profissional = self.context['request'].user.profissional
 
-        if dados['clinica'].profissional != profissional:
+        clinica = dados.get('clinica')
+        if clinica and clinica.profissional != profissional:
             raise serializers.ValidationError("Você não pode agendar em uma clínica que não pertence a você.")
 
-        if dados['paciente'].profissional != profissional:
+        paciente = dados.get('paciente')
+        if paciente and paciente.profissional != profissional:
             raise serializers.ValidationError("Você não pode agendar um paciente que não pertence a você.")
 
         return dados
