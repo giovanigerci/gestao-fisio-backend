@@ -18,6 +18,7 @@ class Agendamento(models.Model):
     hora_fim = models.TimeField()
     status = models.CharField(max_length=2, choices=Status.choices, default=Status.AGENDADO)
     eh_experimental = models.BooleanField(default=False)
+    grupo_recorrencia = models.UUIDField(null=True, blank=True)
 
     class Meta:
         constraints = [
