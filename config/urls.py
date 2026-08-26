@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.urls import path, include
 from profissionais.views_auth import LoginCookieView, RefreshCookieView
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -12,3 +14,5 @@ urlpatterns = [
     path('api/auth/token/', LoginCookieView.as_view(), name='token_obtain_pair'),
     path('api/auth/token/refresh/', RefreshCookieView.as_view(), name='token_refresh'),
 ]
+
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

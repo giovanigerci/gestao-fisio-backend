@@ -6,6 +6,7 @@ class Profissional(models.Model):
     telefone = models.CharField(max_length=20)
     especialidade = models.CharField(max_length=100)
     crefito = models.CharField(max_length=15, unique=True)
+    foto = models.ImageField(upload_to='perfis/', null=True, blank=True)
 
     class Meta:
         verbose_name = 'Profissional'
