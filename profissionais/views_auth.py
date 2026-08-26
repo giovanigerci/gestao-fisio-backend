@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
 
 
 class LoginCookieView(TokenObtainPairView):
@@ -70,3 +71,29 @@ class LogoutView(APIView):
         response.delete_cookie('access_token', path='/api/')
         response.delete_cookie('refresh_token', path='/api/auth/token/refresh/')
         return response
+
+class FotoPerfilView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        profissional = request.user.profissional
+        foto = request.FILES.get('foto')
+
+        if not foto:
+            return Response({'foto': 'Nenhum arquivo enviado.'}, status=400)
+
+        if profissional.foto:
+            profissional.foto.delete(save=False)
+
+        profissional.foto = foto
+        profissional.save()
+
+        url = request.build_absolute_uri(profissional.foto.url)
+        return Response({'foto': url})
+
+    def delete(self, request):
+        profissional = request.user.profissional
+        if profissional.foto:
+            profissional.foto.delete(save=True)
+        return Response(status=204)

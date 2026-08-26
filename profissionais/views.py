@@ -2,7 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .serializers import RegistroSerializer, ProfissionalSerializer
+from .serializers import RegistroSerializer, ProfissionalSerializer, PerfilSerializer
 
 class RegistroView(generics.CreateAPIView):
     serializer_class = RegistroSerializer
@@ -21,5 +21,11 @@ class PerfilView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        serializer = ProfissionalSerializer(request.user.profissional)
+        serializer = PerfilSerializer(request.user.profissional, context={'request': request})
+        return Response(serializer.data)
+
+    def patch(self, request):
+        serializer = PerfilSerializer(request.user.profissional, data=request.data, partial=True, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         return Response(serializer.data)
