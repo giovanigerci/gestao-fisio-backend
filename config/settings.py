@@ -8,13 +8,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-6fln818&loq@^0d9h^px&b@f(dhkoj&#0w1&e3y(0w3apzidlf'
+SECRET_KEY = config('SECRET_KEY')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='', cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
 
 
 # Application definition
@@ -38,6 +36,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -76,8 +75,8 @@ DATABASES = {
         'NAME': config('POSTGRES_DB'),
         'USER': config('POSTGRES_USER'),
         'PASSWORD': config('POSTGRES_PASSWORD'),
-        'HOST': 'localhost',
-        'PORT': 5432,
+        'HOST': config('POSTGRES_HOST', default='localhost'),
+        'PORT': config('POSTGRES_PORT', default=5432, cast=int),
     }
 }
 
@@ -117,6 +116,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -134,10 +134,15 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
 }
 
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:4200',
-]
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='http://localhost:4200',
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()],
+)
 CORS_ALLOW_CREDENTIALS = True
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Segurança de cookies JWT (False em dev, True em produção com HTTPS)
+COOKIE_SECURE = config('COOKIE_SECURE', default=False, cast=bool)
