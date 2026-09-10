@@ -161,3 +161,5 @@ do DRF em cada endpoint, e o Django Admin em `http://127.0.0.1:8000/admin/`.
 - [ ] Cobertura de testes automatizados (regras de cálculo de receita e isolamento multi-tenant)
 - [ ] Pipeline de CI via GitHub Actions
 - [ ] Documentação OpenAPI/Swagger
+- [ ] Migrar armazenamento de mídia (fotos de perfil) para serviço externo (AWS S3 ou Cloudinary) — necessário para plataformas com filesystem efêmero
+- [ ] Deploy em produção (configurar `SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS`, `COOKIE_SECURE=True`, banco de dados gerenciado)
