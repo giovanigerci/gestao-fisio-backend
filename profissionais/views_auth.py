@@ -8,9 +8,13 @@ from rest_framework.response import Response
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.throttling import ScopedRateThrottle
 
 
 class LoginCookieView(TokenObtainPairView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'
+
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
