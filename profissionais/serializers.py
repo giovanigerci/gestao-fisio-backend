@@ -85,3 +85,44 @@ class PerfilSerializer(serializers.Serializer):
             'crefito': instance.crefito,
             'foto': foto_url,
         }
+
+class TrocarSenhaSerializer(serializers.Serializer):
+    senha_atual = serializers.CharField(write_only=True)
+    nova_senha = serializers.CharField(write_only=True)
+    confirmar_senha = serializers.CharField(write_only=True)
+
+    def validate_senha_atual(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError('Senha atual incorreta.')
+        return value
+
+    def validate(self, data):
+        if data['nova_senha'] != data['confirmar_senha']:
+            raise serializers.ValidationError({'confirmar_senha': 'As senhas não coincidem.'})
+
+        # Aplica os validadores de senha do Django (mínimo 8 chars, etc.)
+        from django.contrib.auth.password_validation import validate_password
+        try:
+            validate_password(data['nova_senha'], self.context['request'].user)
+        except Exception as e:
+            raise serializers.ValidationError({'nova_senha': list(e.messages)})
+
+        return data
+
+class RedefinirSenhaSerializer(serializers.Serializer):
+    nova_senha = serializers.CharField(write_only=True)
+    confirmar_senha = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        if data['nova_senha'] != data['confirmar_senha']:
+            raise serializers.ValidationError({'confirmar_senha': 'As senhas não coincidem.'})
+
+        from django.contrib.auth.password_validation import validate_password
+        user = self.context.get('user')
+        try:
+            validate_password(data['nova_senha'], user)
+        except Exception as e:
+            raise serializers.ValidationError({'nova_senha': list(e.messages)})
+
+        return data
