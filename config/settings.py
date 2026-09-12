@@ -135,6 +135,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'login': '5/minute',
         'registro': '3/minute',
+        'password_reset': '3/hour',
     },
 }
 
@@ -150,3 +151,15 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # Segurança de cookies JWT (False em dev, True em produção com HTTPS)
 COOKIE_SECURE = config('COOKIE_SECURE', default=False, cast=bool)
+
+# URL do frontend (para links em e-mails)
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:4200')
+
+# E-mail
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = config('EMAIL_HOST', default='localhost')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Gestão Fisio <noreply@gestaofisio.com>')
