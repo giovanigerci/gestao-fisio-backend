@@ -159,7 +159,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 COOKIE_SAMESITE = config('COOKIE_SAMESITE', default='Lax')
 
 # Segurança de cookies JWT (False em dev, True em produção com HTTPS)
-COOKIE_SECURE = config('COOKIE_SECURE', default=True, cast=bool)
+COOKIE_SECURE = config('COOKIE_SECURE', default=False, cast=bool)
 
 # URL do frontend (para links em e-mails)
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:4200')
