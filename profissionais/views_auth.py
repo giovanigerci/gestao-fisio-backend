@@ -37,7 +37,7 @@ class LoginCookieView(TokenObtainPairView):
             value=str(access),
             httponly=True,
             secure=settings.COOKIE_SECURE,
-            samesite='Lax',
+            samesite=settings.COOKIE_SAMESITE,
             max_age=5 * 60,
             path='/api/',
         )
@@ -48,7 +48,7 @@ class LoginCookieView(TokenObtainPairView):
             value=str(refresh),
             httponly=True,
             secure=settings.COOKIE_SECURE,
-            samesite='Lax',
+            samesite=settings.COOKIE_SAMESITE,
             max_age=max_age_refresh,
             path='/api/auth/token/refresh/',
         )
@@ -75,14 +75,14 @@ class RefreshCookieView(TokenRefreshView):
         response = Response({'detail': 'Token renovado com sucesso.'})
         response.set_cookie(
             key='access_token', value=str(access), httponly=True, secure=settings.COOKIE_SECURE,
-            samesite='Lax', max_age=5 * 60, path='/api/',
+            samesite=settings.COOKIE_SAMESITE, max_age=5 * 60, path='/api/',
         )
 
         if sessao_longa:
             novo_refresh = RefreshToken.for_user(request.user)
             response.set_cookie(
                 key='refresh_token', value=str(novo_refresh), httponly=True, secure=settings.COOKIE_SECURE,
-                samesite='Lax', max_age=30 * 24 * 60 * 60, path='/api/auth/token/refresh/',
+                samesite=settings.COOKIE_SAMESITE, max_age=30 * 24 * 60 * 60, path='/api/auth/token/refresh/',
             )
 
         return response
