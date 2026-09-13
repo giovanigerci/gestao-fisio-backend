@@ -88,12 +88,14 @@ class RefreshCookieView(TokenRefreshView):
         return response
 
 class LogoutView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         response = Response({'detail': 'Logout realizado com sucesso.'})
-        response.delete_cookie('access_token', path='/api/')
-        response.delete_cookie('refresh_token', path='/api/auth/token/refresh/')
+        response.delete_cookie('access_token', path='/api/', samesite=settings.COOKIE_SAMESITE)
+        response.cookies['access_token']['secure'] = settings.COOKIE_SECURE
+        response.delete_cookie('refresh_token', path='/api/auth/token/refresh/', samesite=settings.COOKIE_SAMESITE)
+        response.cookies['refresh_token']['secure'] = settings.COOKIE_SECURE
         return response
 
 class FotoPerfilView(APIView):
