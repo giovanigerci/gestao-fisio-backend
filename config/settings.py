@@ -151,15 +151,28 @@ CORS_ALLOWED_ORIGINS = config(
     default='http://localhost:4200',
     cast=lambda v: [s.strip() for s in v.split(',') if s.strip()],
 )
+CSRF_TRUSTED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS', # Use same origins for CSRF trusted if not specified otherwise
+    default='http://localhost:4200',
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()],
+)
 CORS_ALLOW_CREDENTIALS = True
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+COOKIE_DOMAIN = config('COOKIE_DOMAIN', default=None)
 COOKIE_SAMESITE = config('COOKIE_SAMESITE', default='Lax')
 
 # Segurança de cookies JWT (False em dev, True em produção com HTTPS)
 COOKIE_SECURE = config('COOKIE_SECURE', default=False, cast=bool)
+
+SESSION_COOKIE_DOMAIN = COOKIE_DOMAIN
+CSRF_COOKIE_DOMAIN = COOKIE_DOMAIN
+SESSION_COOKIE_SAMESITE = COOKIE_SAMESITE
+SESSION_COOKIE_SECURE = COOKIE_SECURE
+CSRF_COOKIE_SAMESITE = COOKIE_SAMESITE
+CSRF_COOKIE_SECURE = COOKIE_SECURE
 
 # URL do frontend (para links em e-mails)
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:4200')

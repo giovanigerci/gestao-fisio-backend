@@ -38,6 +38,7 @@ class LoginCookieView(TokenObtainPairView):
             httponly=True,
             secure=settings.COOKIE_SECURE,
             samesite=settings.COOKIE_SAMESITE,
+            domain=settings.COOKIE_DOMAIN,
             max_age=5 * 60,
             path='/api/',
         )
@@ -49,6 +50,7 @@ class LoginCookieView(TokenObtainPairView):
             httponly=True,
             secure=settings.COOKIE_SECURE,
             samesite=settings.COOKIE_SAMESITE,
+            domain=settings.COOKIE_DOMAIN,
             max_age=max_age_refresh,
             path='/api/auth/token/refresh/',
         )
@@ -75,14 +77,14 @@ class RefreshCookieView(TokenRefreshView):
         response = Response({'detail': 'Token renovado com sucesso.'})
         response.set_cookie(
             key='access_token', value=str(access), httponly=True, secure=settings.COOKIE_SECURE,
-            samesite=settings.COOKIE_SAMESITE, max_age=5 * 60, path='/api/',
+            samesite=settings.COOKIE_SAMESITE, domain=settings.COOKIE_DOMAIN, max_age=5 * 60, path='/api/',
         )
 
         if sessao_longa:
             novo_refresh = RefreshToken.for_user(request.user)
             response.set_cookie(
                 key='refresh_token', value=str(novo_refresh), httponly=True, secure=settings.COOKIE_SECURE,
-                samesite=settings.COOKIE_SAMESITE, max_age=30 * 24 * 60 * 60, path='/api/auth/token/refresh/',
+                samesite=settings.COOKIE_SAMESITE, domain=settings.COOKIE_DOMAIN, max_age=30 * 24 * 60 * 60, path='/api/auth/token/refresh/',
             )
 
         return response
@@ -92,9 +94,9 @@ class LogoutView(APIView):
 
     def post(self, request):
         response = Response({'detail': 'Logout realizado com sucesso.'})
-        response.delete_cookie('access_token', path='/api/', samesite=settings.COOKIE_SAMESITE)
+        response.delete_cookie('access_token', path='/api/', domain=settings.COOKIE_DOMAIN, samesite=settings.COOKIE_SAMESITE)
         response.cookies['access_token']['secure'] = settings.COOKIE_SECURE
-        response.delete_cookie('refresh_token', path='/api/auth/token/refresh/', samesite=settings.COOKIE_SAMESITE)
+        response.delete_cookie('refresh_token', path='/api/auth/token/refresh/', domain=settings.COOKIE_DOMAIN, samesite=settings.COOKIE_SAMESITE)
         response.cookies['refresh_token']['secure'] = settings.COOKIE_SECURE
         return response
 
