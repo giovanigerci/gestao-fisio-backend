@@ -13,6 +13,18 @@ class PacienteSerializer(serializers.ModelSerializer):
         fields = ['id', 'profissional', 'nome', 'cpf', 'telefone', 'email', 'data_nascimento', 'endereco', 'historico_medico',
                   'ultima_visita', 'total_sessoes', 'status']
         read_only_fields = ['profissional']
+        extra_kwargs = {
+            'cpf': {
+                'error_messages': {
+                    'unique': 'Já existe um paciente cadastrado com este CPF.'
+                }
+            },
+            'email': {
+                'error_messages': {
+                    'unique': 'Já existe um paciente cadastrado com este e-mail.'
+                }
+            }
+        }
 
     def get_total_sessoes(self, obj):
         return Agendamento.objects.filter(paciente=obj, status='RE').count()

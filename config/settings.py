@@ -110,9 +110,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'pt-br'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Sao_Paulo'
 
 USE_I18N = True
 
@@ -152,7 +152,7 @@ CORS_ALLOWED_ORIGINS = config(
     cast=lambda v: [s.strip() for s in v.split(',') if s.strip()],
 )
 CSRF_TRUSTED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS', # Use same origins for CSRF trusted if not specified otherwise
+    'CORS_ALLOWED_ORIGINS',
     default='http://localhost:4200',
     cast=lambda v: [s.strip() for s in v.split(',') if s.strip()],
 )
