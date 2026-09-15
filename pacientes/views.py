@@ -7,7 +7,7 @@ from .serializers import PacienteSerializer
 class PacienteViewSet(viewsets.ModelViewSet):
     serializer_class = PacienteSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['nome']
+    search_fields = ['nome__unaccent']
     ordering_fields = ['nome']
     ordering = ['nome']
 
