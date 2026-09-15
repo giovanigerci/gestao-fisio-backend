@@ -1,4 +1,4 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Clinica
@@ -6,6 +6,10 @@ from .serializers import ClinicaSerializer
 
 class ClinicaViewSet(viewsets.ModelViewSet):
     serializer_class = ClinicaSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['nome']
+    ordering_fields = ['nome']
+    ordering = ['nome']
 
     def get_queryset(self):
         return Clinica.objects.filter(profissional=self.request.user.profissional)
