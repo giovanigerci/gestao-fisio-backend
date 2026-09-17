@@ -13,18 +13,6 @@ class PacienteSerializer(serializers.ModelSerializer):
         fields = ['id', 'profissional', 'nome', 'cpf', 'telefone', 'email', 'data_nascimento', 'endereco', 'historico_medico',
                   'ultima_visita', 'total_sessoes', 'status']
         read_only_fields = ['profissional']
-        extra_kwargs = {
-            'cpf': {
-                'error_messages': {
-                    'unique': 'Já existe um paciente cadastrado com este CPF.'
-                }
-            },
-            'email': {
-                'error_messages': {
-                    'unique': 'Já existe um paciente cadastrado com este e-mail.'
-                }
-            }
-        }
 
     def get_total_sessoes(self, obj):
         return Agendamento.objects.filter(paciente=obj, status='RE').count()
@@ -47,3 +35,28 @@ class PacienteSerializer(serializers.ModelSerializer):
             if value < limite_antigo:
                 raise serializers.ValidationError("Data de nascimento inválida.")
         return value
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        profissional = request.user.profissional if request and hasattr(request.user, 'profissional') else None
+
+        if profissional:
+            instance_id = self.instance.id if self.instance else None
+
+            cpf = attrs.get('cpf')
+            if cpf:
+                qs = Paciente.objects.filter(profissional=profissional, cpf=cpf)
+                if instance_id:
+                    qs = qs.exclude(id=instance_id)
+                if qs.exists():
+                    raise serializers.ValidationError({'cpf': ['Já existe um paciente cadastrado com este CPF.']})
+
+            email = attrs.get('email')
+            if email:
+                qs = Paciente.objects.filter(profissional=profissional, email=email)
+                if instance_id:
+                    qs = qs.exclude(id=instance_id)
+                if qs.exists():
+                    raise serializers.ValidationError({'email': ['Já existe um paciente cadastrado com este e-mail.']})
+
+        return super().validate(attrs)
