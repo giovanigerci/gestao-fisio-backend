@@ -28,7 +28,8 @@ class ResumoFinanceiroView(APIView):
             profissional=request.user.profissional,
             data__gte=inicio,
             data__lte=fim,
-        ).exclude(status='CA')
+            status='RE'
+        )
 
         resumo = agendamentos.values('clinica', 'clinica__nome').annotate(
             total_atendimentos=Count('id'),
