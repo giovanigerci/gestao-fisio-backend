@@ -12,7 +12,9 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
     serializer_class = AgendamentoSerializer
 
     def get_queryset(self):
-        queryset = Agendamento.objects.filter(profissional=self.request.user.profissional)
+        queryset = Agendamento.objects.filter(
+            profissional=self.request.user.profissional
+        ).select_related('paciente', 'clinica')
 
         data_inicio = self.request.query_params.get('data_inicio')
         data_fim = self.request.query_params.get('data_fim')
