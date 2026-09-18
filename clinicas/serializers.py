@@ -13,6 +13,8 @@ class ClinicaSerializer(serializers.ModelSerializer):
         read_only_fields = ['profissional']
 
     def get_total_atendimentos(self, obj):
+        if hasattr(obj, 'total_atendimentos'):
+            return obj.total_atendimentos
         return Agendamento.objects.filter(clinica=obj, status='RE').count()
 
     def get_receita_total(self, obj):

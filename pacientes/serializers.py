@@ -15,13 +15,19 @@ class PacienteSerializer(serializers.ModelSerializer):
         read_only_fields = ['profissional']
 
     def get_total_sessoes(self, obj):
+        if hasattr(obj, 'total_sessoes'):
+            return obj.total_sessoes
         return Agendamento.objects.filter(paciente=obj, status='RE').count()
 
     def get_ultima_visita(self, obj):
+        if hasattr(obj, 'ultima_visita'):
+            return obj.ultima_visita
         ultimo = Agendamento.objects.filter(paciente=obj, status='RE').order_by('-data').first()
         return ultimo.data if ultimo else None
 
     def get_status(self, obj):
+        if hasattr(obj, 'status'):
+            return obj.status
         limite = date.today() - timedelta(days=60)
         tem_recente = Agendamento.objects.filter(paciente=obj, status='RE', data__gte=limite).exists()
         tem_futuro = Agendamento.objects.filter(paciente=obj, status='AG', data__gte=date.today()).exists()
