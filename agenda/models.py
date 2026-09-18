@@ -21,6 +21,9 @@ class Agendamento(models.Model):
     grupo_recorrencia = models.UUIDField(null=True, blank=True)
 
     class Meta:
+        indexes = [
+            models.Index(fields=['data'], name='agenda_agendamento_data_idx'),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=['paciente', 'data', 'hora_inicio'],
