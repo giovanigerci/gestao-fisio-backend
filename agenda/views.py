@@ -1,6 +1,7 @@
 import uuid
-from datetime import timedelta
-from django.db import IntegrityError
+from datetime import datetime, timedelta
+from django.db import IntegrityError, transaction
+from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -80,4 +81,61 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
             'agendamentos_criados': agendamentos_criados,
             'agendamentos_conflitantes': agendamentos_conflitantes},
             status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['patch'], url_path='confirmar-dia')
+    def confirmar_dia(self, request):
+        data_str = request.query_params.get('data') or request.data.get('data')
+        if not data_str:
+            return Response({'erro': 'O parâmetro "data" é obrigatório.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            data_alvo = datetime.strptime(data_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'erro': 'Formato de data inválido. Utilize YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        hoje = timezone.localdate()
+        if data_alvo > hoje:
+            return Response({'erro': 'Não é possível confirmar atendimentos de uma data futura.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        profissional = request.user.profissional
+        agendamentos_dia = Agendamento.objects.filter(
+            profissional=profissional,
+            data=data_alvo
+        )
+
+        if not agendamentos_dia.exists():
+            return Response({'erro': 'Não há agendamentos cadastrados para este dia.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if data_alvo == hoje:
+            ultimo_agendamento = agendamentos_dia.order_by('-hora_fim').first()
+            if ultimo_agendamento:
+                hora_atual = timezone.localtime().time()
+                if hora_atual < ultimo_agendamento.hora_fim:
+                    return Response(
+                        {'erro': 'O expediente de hoje ainda não foi encerrado. Aguarde o término do último atendimento.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+        pendentes = agendamentos_dia.filter(status=Agendamento.Status.AGENDADO)
+        total_pendentes = pendentes.count()
+        if total_pendentes == 0:
+            return Response(
+                {'erro': 'Não há agendamentos pendentes para confirmar neste dia.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        with transaction.atomic():
+            pendentes.update(status=Agendamento.Status.REALIZADO)
+
+        agendamentos_atualizados = Agendamento.objects.filter(
+            profissional=profissional,
+            data=data_alvo
+        ).select_related('paciente', 'clinica').order_by('hora_inicio')
+
+        serializer = self.get_serializer(agendamentos_atualizados, many=True)
+        return Response({
+            'mensagem': f'{total_pendentes} atendimento(s) confirmado(s) com sucesso.',
+            'total_confirmados': total_pendentes,
+            'agendamentos': serializer.data
+        }, status=status.HTTP_200_OK)
                     
