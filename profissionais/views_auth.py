@@ -8,6 +8,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import AuthenticationFailed
@@ -26,9 +27,14 @@ class LoginCookieView(TokenObtainPairView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        access = serializer.validated_data['access']
-        refresh = serializer.validated_data['refresh']
+        user = serializer.user
         manter_conectado = request.data.get('manter_conectado', False)
+
+        refresh = RefreshToken.for_user(user)
+        if manter_conectado:
+            refresh.set_exp(lifetime=datetime.timedelta(days=30))
+        
+        access = refresh.access_token
 
         response = Response({'detail': 'Login realizado com sucesso.'})
 
@@ -65,27 +71,43 @@ class RefreshCookieView(TokenRefreshView):
         if not refresh_token:
             raise AuthenticationFailed('Refresh token não encontrado.')
 
-        serializer = self.get_serializer(data={'refresh': refresh_token})
-        serializer.is_valid(raise_exception=True)
-        access = serializer.validated_data['access']
+        try:
+            token_antigo = RefreshToken(refresh_token)
+        except (InvalidToken, TokenError):
+            raise AuthenticationFailed('Token inválido ou expirado.')
 
-        token_antigo = RefreshToken(refresh_token)
+        try:
+            user = User.objects.get(id=token_antigo.get('user_id'))
+        except User.DoesNotExist:
+            raise AuthenticationFailed('Usuário não encontrado.')
+
         expira_em = datetime.datetime.fromtimestamp(token_antigo['exp'], tz=datetime.timezone.utc)
         tempo_restante = expira_em - timezone.now()
         sessao_longa = tempo_restante > datetime.timedelta(hours=24)
+
+        novo_refresh = RefreshToken.for_user(user)
+        if sessao_longa:
+            novo_refresh.set_exp(lifetime=datetime.timedelta(days=30))
+            max_age_refresh = 30 * 24 * 60 * 60
+        else:
+            max_age_refresh = 24 * 60 * 60
+
+        access = novo_refresh.access_token
+
+        try:
+            token_antigo.blacklist()
+        except AttributeError:
+            pass
 
         response = Response({'detail': 'Token renovado com sucesso.'})
         response.set_cookie(
             key='access_token', value=str(access), httponly=True, secure=settings.COOKIE_SECURE,
             samesite=settings.COOKIE_SAMESITE, domain=settings.COOKIE_DOMAIN, max_age=5 * 60, path='/api/',
         )
-
-        if sessao_longa:
-            novo_refresh = RefreshToken.for_user(request.user)
-            response.set_cookie(
-                key='refresh_token', value=str(novo_refresh), httponly=True, secure=settings.COOKIE_SECURE,
-                samesite=settings.COOKIE_SAMESITE, domain=settings.COOKIE_DOMAIN, max_age=30 * 24 * 60 * 60, path='/api/auth/token/refresh/',
-            )
+        response.set_cookie(
+            key='refresh_token', value=str(novo_refresh), httponly=True, secure=settings.COOKIE_SECURE,
+            samesite=settings.COOKIE_SAMESITE, domain=settings.COOKIE_DOMAIN, max_age=max_age_refresh, path='/api/auth/token/refresh/',
+        )
 
         return response
 
