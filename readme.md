@@ -118,7 +118,7 @@ que lê o `access_token` diretamente do cookie da requisição.
 | POST        | `/api/auth/token/refresh/`       | Renova o `access_token` via `refresh_token` no cookie |
 | POST        | `/api/auth/logout/`              | Invalida o `refresh_token` e limpa os cookies   |
 | GET / PATCH | `/api/auth/me/`                  | Perfil do profissional autenticado              |
-| PUT         | `/api/auth/me/foto/`             | Upload ou remoção da foto de perfil             |
+| POST / DELETE | `/api/auth/me/foto/`           | Upload (JPEG, PNG ou WEBP, até 5 MB) ou remoção da foto de perfil |
 | POST        | `/api/auth/trocar-senha/`        | Troca de senha (requer senha atual)             |
 | POST        | `/api/auth/esqueci-senha/`       | Solicita e-mail de recuperação de senha         |
 | POST        | `/api/auth/redefinir-senha/`     | Redefine a senha via token do e-mail            |
@@ -218,11 +218,16 @@ Todas as variáveis estão documentadas em `.env.example`. As principais:
 | `FRONTEND_URL`        | —           | URL do frontend para links de e-mail (padrão: `http://localhost:4200`) |
 | `EMAIL_BACKEND`       | —           | Backend de e-mail (padrão: `console` — imprime no terminal) |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | — | Configuração SMTP para envio de e-mails reais |
+| `USE_S3`              | —           | `True` salva fotos de perfil no Cloudflare R2; `False` salva em `./media` (padrão: `False`) |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | ✅ (se `USE_S3`) | Credenciais do token de API do R2 |
+| `R2_BUCKET_NAME`      | ✅ (se `USE_S3`) | Nome do bucket R2                             |
+| `R2_ENDPOINT_URL`     | ✅ (se `USE_S3`) | `https://<account_id>.r2.cloudflarestorage.com` |
+| `R2_PUBLIC_DOMAIN`    | ✅ (se `USE_S3`) | Domínio público do bucket, sem `https://` (ex: `pub-xxxx.r2.dev`) |
 
 ## Próximos passos
 
 - [ ] Cobertura de testes automatizados (regras de cálculo de receita e isolamento multi-tenant)
 - [ ] Pipeline de CI via GitHub Actions
 - [ ] Documentação OpenAPI/Swagger
-- [ ] Migrar armazenamento de mídia (fotos de perfil) para serviço externo (AWS S3 ou Cloudinary) — necessário para plataformas com filesystem efêmero
+- [x] Migrar armazenamento de mídia (fotos de perfil) para serviço externo (Cloudflare R2, via `django-storages`) — necessário para plataformas com filesystem efêmero
 - [ ] Deploy em produção (configurar `SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS`, `COOKIE_SECURE=True`, banco de dados gerenciado)

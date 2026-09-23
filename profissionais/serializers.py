@@ -86,6 +86,27 @@ class PerfilSerializer(serializers.Serializer):
             'foto': foto_url,
         }
 
+class FotoPerfilSerializer(serializers.Serializer):
+    TAMANHO_MAXIMO = 5 * 1024 * 1024  # 5 MB
+    FORMATOS_PERMITIDOS = {'JPEG': '.jpg', 'PNG': '.png', 'WEBP': '.webp'}
+
+    foto = serializers.ImageField(error_messages={
+        'required': 'Nenhum arquivo enviado.',
+        'empty': 'O arquivo enviado está vazio.',
+        'invalid_image': 'O arquivo enviado não é uma imagem válida.',
+    })
+
+    def validate_foto(self, value):
+        if value.size > self.TAMANHO_MAXIMO:
+            raise serializers.ValidationError('A imagem deve ter no máximo 5 MB.')
+
+        formato = getattr(getattr(value, 'image', None), 'format', None)
+        if formato not in self.FORMATOS_PERMITIDOS:
+            raise serializers.ValidationError('Formato não suportado. Envie uma imagem JPEG, PNG ou WEBP.')
+
+        value.name = f'foto{self.FORMATOS_PERMITIDOS[formato]}'
+        return value
+
 class TrocarSenhaSerializer(serializers.Serializer):
     senha_atual = serializers.CharField(write_only=True)
     nova_senha = serializers.CharField(write_only=True)

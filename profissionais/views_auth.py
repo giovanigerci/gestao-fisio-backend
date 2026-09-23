@@ -16,7 +16,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.throttling import ScopedRateThrottle
 
-from .serializers import TrocarSenhaSerializer, RedefinirSenhaSerializer
+from .serializers import TrocarSenhaSerializer, RedefinirSenhaSerializer, FotoPerfilSerializer
 
 
 class LoginCookieView(TokenObtainPairView):
@@ -127,18 +127,20 @@ class FotoPerfilView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
+        serializer = FotoPerfilSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
         profissional = request.user.profissional
-        foto = request.FILES.get('foto')
+        foto_antiga = profissional.foto.name if profissional.foto else None
 
-        if not foto:
-            return Response({'foto': 'Nenhum arquivo enviado.'}, status=400)
+        profissional.foto = serializer.validated_data['foto']
+        profissional.save(update_fields=['foto'])
 
-        if profissional.foto:
-            profissional.foto.delete(save=False)
+        # Só remove a foto antiga depois que a nova foi salva com sucesso
+        if foto_antiga:
+            profissional.foto.storage.delete(foto_antiga)
 
-        profissional.foto = foto
-        profissional.save()
-
+        # build_absolute_uri mantém URLs já absolutas (R2) e completa as relativas (disco local)
         url = request.build_absolute_uri(profissional.foto.url)
         return Response({'foto': url})
 

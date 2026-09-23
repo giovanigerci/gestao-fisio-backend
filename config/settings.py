@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.postgres',
     'corsheaders',
+    'storages',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -171,6 +172,39 @@ CORS_ALLOW_CREDENTIALS = True
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Armazenamento de mídia (fotos de perfil).
+# Em produção (USE_S3=True) os uploads vão para o Cloudflare R2 (compatível com S3),
+# pois o disco do Render é efêmero. Em dev, continuam no disco local (MEDIA_ROOT).
+USE_S3 = config('USE_S3', default=False, cast=bool)
+
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+    },
+}
+
+if USE_S3:
+    STORAGES['default']['BACKEND'] = 'storages.backends.s3.S3Storage'
+
+    AWS_ACCESS_KEY_ID = config('R2_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = config('R2_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = config('R2_BUCKET_NAME')
+    AWS_S3_ENDPOINT_URL = config('R2_ENDPOINT_URL')  # https://<account_id>.r2.cloudflarestorage.com
+    # Domínio público do bucket, sem protocolo (ex: pub-xxxx.r2.dev ou midia.seudominio.com).
+    # Obrigatório: o endpoint S3 do R2 exige autenticação, então sem ele as URLs não seriam públicas.
+    AWS_S3_CUSTOM_DOMAIN = config(
+        'R2_PUBLIC_DOMAIN',
+        cast=lambda v: v.strip().removeprefix('https://').removeprefix('http://').rstrip('/'),
+    )
+    AWS_S3_REGION_NAME = 'auto'
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    AWS_DEFAULT_ACL = None  # R2 não suporta ACLs por objeto
+    AWS_QUERYSTRING_AUTH = False
+    AWS_S3_FILE_OVERWRITE = False
 
 COOKIE_DOMAIN = config('COOKIE_DOMAIN', default=None)
 COOKIE_SAMESITE = config('COOKIE_SAMESITE', default='Lax')
