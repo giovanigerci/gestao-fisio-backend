@@ -3,9 +3,11 @@ from django.urls import path, include
 from profissionais.views_auth import LoginCookieView, RefreshCookieView
 from django.conf import settings
 from django.conf.urls.static import static
+from .views import HealthCheckView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/health/', HealthCheckView.as_view(), name='health'),
     path('api/', include('agenda.urls')),
     path('api/', include('clinicas.urls')),
     path('api/', include('pacientes.urls')),

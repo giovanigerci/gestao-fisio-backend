@@ -109,6 +109,12 @@ que lê o `access_token` diretamente do cookie da requisição.
 
 ## Endpoints completos
 
+### Infraestrutura
+
+| Método      | Rota                             | Descrição                                       |
+|-------------|----------------------------------|-------------------------------------------------|
+| GET / HEAD  | `/api/health/`                   | Liveness check público para monitoramento. Não consulta o banco (não impede o Neon de suspender) |
+
 ### Autenticação (`/api/auth/`)
 
 | Método      | Rota                             | Descrição                                       |
