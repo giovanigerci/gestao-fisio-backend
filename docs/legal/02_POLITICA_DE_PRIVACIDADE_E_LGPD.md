@@ -1,7 +1,7 @@
 # Política de Privacidade e Proteção de Dados Pessoais (LGPD) — Gestão Fisio
 
-*Última atualização: 13 de Setembro de 2026*  
-*Versão: 1.0*
+*Última atualização: 24 de Setembro de 2026*  
+*Versão: 1.1*
 
 A presente **Política de Privacidade e Proteção de Dados Pessoais** ("Política") tem como objetivo informar, de maneira clara, objetiva e transparente, como o **Gestão Fisio** ("Nós" ou "Plataforma") coleta, utiliza, armazena, compartilha e protege os dados pessoais e dados pessoais sensíveis dos seus Usuários e respectivos pacientes, em estrita conformidade com a **Lei Geral de Proteção de Dados Pessoais (Lei Federal nº 13.709/2018 — LGPD)**, o **Marco Civil da Internet (Lei Federal nº 12.965/2014)** e os regulamentos editados pela **Autoridade Nacional de Proteção de Dados (ANPD)**.
 
@@ -54,7 +54,7 @@ No ecossistema do **Gestão Fisio**, os papéis jurídicos distribuem-se da segu
 | **Telefone** | Contato direto, segurança e validação cadastral (obrigatório no cadastro). | Execução de Contrato (Art. 7º, V) |
 | **CREFITO e Especialidade** | Validação mandatória de registro de classe e regularidade perante o COFFITO/CREFITO. | Cumprimento de Obrigação Legal e Legítimo Interesse (Art. 7º, II e IX) |
 | **Nome, Sobrenome e E-mail (Perfil)** | Identificação nominal do profissional e envio de tokens de redefinição de senha. | Execução de Contrato (Art. 7º, V) |
-| **Foto de Perfil** | Personalização visual da interface do profissional (armazenada em diretório de mídia protegido). | Execução de Contrato (Art. 7º, V) |
+| **Foto de Perfil** (opcional) | Personalização visual da interface do profissional. A imagem é guardada em serviço de armazenamento de arquivos em nuvem, sob um endereço (URL) aleatório que não revela o nome original do arquivo; quem tiver esse endereço consegue visualizá-la. O profissional pode removê-la a qualquer momento, o que exclui o arquivo definitivamente. | Execução de Contrato (Art. 7º, V) |
 | **Endereço IP, Data/Hora e Logs de Conexão** | Rastreabilidade de transações e cumprimento obrigatório do Marco Civil da Internet. | Cumprimento de Obrigação Legal (Art. 7º, II c/c Art. 15 da Lei nº 12.965/2014) |
 
 ### 3.2. Dados Tratados dos Pacientes (Inseridos pelo Profissional)
@@ -91,7 +91,9 @@ Os dados tratados pelo Gestão Fisio são compartilhados estritamente na medida 
 
 1. **Infraestrutura de Hospedagem e Banco de Dados PostgreSQL**: Servidores dedicados ao processamento da aplicação e persistência do banco relacional, operando com regras de firewall e isolamento de rede.
 2. **Serviço de Correio Eletrônico Transacional (SMTP)**: Utilizado exclusivamente para envio de links autenticados de redefinição de senha requisitados pelo próprio profissional.
-3. **Autoridades Judiciais e Regulatórias**: Mediante ordem judicial fundamentada ou solicitação formal expedida pela ANPD ou conselhos de fiscalização profissional (COFFITO/CREFITO).
+3. **Armazenamento de Arquivos em Nuvem**: Utilizado exclusivamente para guardar a foto de perfil enviada pelo próprio profissional. Não recebe dados de pacientes.
+4. **Hospedagem da Interface Web**: Entrega ao navegador os arquivos da aplicação e recebe apenas dados técnicos de acesso (como endereço IP e data/hora). Não tem acesso aos dados de pacientes, que trafegam diretamente entre o navegador e a API.
+5. **Autoridades Judiciais e Regulatórias**: Mediante ordem judicial fundamentada ou solicitação formal expedida pela ANPD ou conselhos de fiscalização profissional (COFFITO/CREFITO).
 
 A Plataforma **NÃO vende, NÃO aluga e NÃO monetiza** dados pessoais de qualquer natureza.
 
