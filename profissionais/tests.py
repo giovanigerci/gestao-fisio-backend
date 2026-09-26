@@ -1,8 +1,13 @@
 import io
+import re
 import shutil
+import smtplib
 import tempfile
+from unittest.mock import patch
 from PIL import Image
 from django.contrib.auth.models import User
+from django.core import mail
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
@@ -128,3 +133,98 @@ class FotoPerfilAPITestCase(TestCase):
         self.profissional.refresh_from_db()
         self.assertFalse(self.profissional.foto)
         self.assertFalse(storage.exists(nome))
+
+
+@override_settings(
+    FRONTEND_URL='https://gestao-fisio.com/',
+    DEFAULT_FROM_EMAIL='Gestão Fisio <nao-responda@gestao-fisio.com>',
+)
+class RecuperacaoSenhaAPITestCase(TestCase):
+    MENSAGEM = 'Se o e-mail estiver cadastrado, você receberá um link de recuperação.'
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            username='dr_silva', email='joao@exemplo.com', password='SenhaAntiga@123'
+        )
+        self.client = APIClient()
+        self.url_solicitar = '/api/auth/esqueci-senha/'
+        self.url_redefinir = '/api/auth/redefinir-senha/'
+
+    def extrair_uid_e_token(self, corpo):
+        link = re.search(r'https://gestao-fisio\.com/redefinir-senha\?uid=(\S+)&token=(\S+)', corpo)
+        self.assertIsNotNone(link, 'Link de redefinição não encontrado no e-mail')
+        return link.group(1), link.group(2)
+
+    def test_email_cadastrado_recebe_link(self):
+        response = self.client.post(self.url_solicitar, {'email': 'JOAO@exemplo.com '})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['detail'], self.MENSAGEM)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['joao@exemplo.com'])
+        self.assertEqual(mail.outbox[0].from_email, 'Gestão Fisio <nao-responda@gestao-fisio.com>')
+        self.extrair_uid_e_token(mail.outbox[0].body)
+
+    def test_email_nao_cadastrado_tem_mesma_resposta_e_nao_envia(self):
+        response = self.client.post(self.url_solicitar, {'email': 'ninguem@exemplo.com'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['detail'], self.MENSAGEM)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_falha_no_envio_nao_revela_que_o_email_existe(self):
+        with patch('profissionais.views_auth.send_mail', side_effect=smtplib.SMTPException('fora do ar')), \
+                self.assertLogs('profissionais.views_auth', level='ERROR') as logs:
+            response = self.client.post(self.url_solicitar, {'email': 'joao@exemplo.com'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['detail'], self.MENSAGEM)
+        self.assertNotIn('joao@exemplo.com', ''.join(logs.output))
+
+    def test_email_repetido_em_duas_contas_nao_quebra(self):
+        User.objects.create_user(username='dr_silva_2', email='joao@exemplo.com', password='x')
+
+        response = self.client.post(self.url_solicitar, {'email': 'joao@exemplo.com'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_conta_inativa_nao_recebe_link(self):
+        self.user.is_active = False
+        self.user.save()
+
+        self.client.post(self.url_solicitar, {'email': 'joao@exemplo.com'})
+
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_fluxo_completo_redefine_senha_e_link_so_vale_uma_vez(self):
+        self.client.post(self.url_solicitar, {'email': 'joao@exemplo.com'})
+        uid, token = self.extrair_uid_e_token(mail.outbox[0].body)
+        dados = {'uid': uid, 'token': token, 'nova_senha': 'NovaSenha@456', 'confirmar_senha': 'NovaSenha@456'}
+
+        response = self.client.post(self.url_redefinir, dados)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('NovaSenha@456'))
+
+        reuso = self.client.post(self.url_redefinir, dados)
+        self.assertEqual(reuso.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_token_invalido_e_rejeitado(self):
+        dados = {'uid': 'MQ', 'token': 'token-falso', 'nova_senha': 'NovaSenha@456', 'confirmar_senha': 'NovaSenha@456'}
+
+        response = self.client.post(self.url_redefinir, dados)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('SenhaAntiga@123'))
+
+    def test_limite_de_solicitacoes_por_hora(self):
+        for _ in range(3):
+            self.client.post(self.url_solicitar, {'email': 'ninguem@exemplo.com'})
+
+        response = self.client.post(self.url_solicitar, {'email': 'ninguem@exemplo.com'})
+
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)

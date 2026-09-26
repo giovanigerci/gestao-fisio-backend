@@ -1,4 +1,5 @@
 import datetime
+import logging
 from django.conf import settings
 from django.utils import timezone
 from django.contrib.auth.models import User
@@ -17,6 +18,8 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.throttling import ScopedRateThrottle
 
 from .serializers import TrocarSenhaSerializer, RedefinirSenhaSerializer, FotoPerfilSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class LoginCookieView(TokenObtainPairView):
@@ -179,37 +182,33 @@ class SolicitarResetSenhaView(APIView):
         if not email:
             return resposta
 
-        try:
-            user = User.objects.get(email__iexact=email)
-        except User.DoesNotExist:
-            return resposta
-
-        # Gera uid e token seguros
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = default_token_generator.make_token(user)
-
-        # Constrói link para o frontend
-        frontend_url = settings.FRONTEND_URL.rstrip('/')
-        link = f'{frontend_url}/redefinir-senha?uid={uid}&token={token}'
-
-        # Envia e-mail
-        send_mail(
-            subject='Recuperação de Senha — Gestão Fisio',
-            message=(
-                f'Olá, {user.get_full_name() or user.username}!\n\n'
-                f'Recebemos uma solicitação para redefinir a senha da sua conta.\n\n'
-                f'Clique no link abaixo para criar uma nova senha:\n'
-                f'{link}\n\n'
-                f'Se você não solicitou essa alteração, ignore este e-mail.\n'
-                f'O link expira automaticamente após o uso.\n\n'
-                f'— Equipe Gestão Fisio'
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+        for user in User.objects.filter(email__iexact=email, is_active=True):
+            self._enviar_link(user)
 
         return resposta
+
+    def _enviar_link(self, user):
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        link = f'{settings.FRONTEND_URL.rstrip("/")}/redefinir-senha?uid={uid}&token={token}'
+
+        try:
+            send_mail(
+                subject='Recuperação de Senha — Gestão Fisio',
+                message=(
+                    f'Olá, {user.get_full_name() or user.username}!\n\n'
+                    f'Recebemos uma solicitação para redefinir a senha da sua conta.\n\n'
+                    f'Clique no link abaixo para criar uma nova senha:\n'
+                    f'{link}\n\n'
+                    f'Se você não solicitou essa alteração, ignore este e-mail.\n'
+                    f'O link expira automaticamente após o uso.\n\n'
+                    f'— Equipe Gestão Fisio'
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+            )
+        except Exception:
+            logger.exception('Falha ao enviar e-mail de redefinição de senha (user_id=%s)', user.pk)
 
 
 class RedefinirSenhaView(APIView):
