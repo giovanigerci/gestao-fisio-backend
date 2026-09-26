@@ -222,8 +222,10 @@ Todas as variáveis estão documentadas em `.env.example`. As principais:
 | `COOKIE_SECURE`       | —           | `True` em produção com HTTPS, `False` em dev         |
 | `COOKIE_DOMAIN`       | —           | Domínio dos cookies JWT (necessário em produção)     |
 | `FRONTEND_URL`        | —           | URL do frontend para links de e-mail (padrão: `http://localhost:4200`) |
-| `EMAIL_BACKEND`       | —           | Backend de e-mail (padrão: `console` — imprime no terminal) |
-| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | — | Configuração SMTP para envio de e-mails reais |
+| `EMAIL_BACKEND`       | ✅ (produção) | Backend de e-mail (padrão: `console` — imprime no terminal, não envia nada). Em produção: `django.core.mail.backends.smtp.EmailBackend` |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | ✅ (produção) | SMTP do Resend: `smtp.resend.com`, `587`, usuário `resend`, senha = API key |
+| `EMAIL_TIMEOUT`       | —           | Tempo máximo (s) de conexão com o SMTP (padrão: `10`) |
+| `DEFAULT_FROM_EMAIL`  | —           | Remetente; precisa ser do domínio verificado no Resend (padrão: `Gestão Fisio <nao-responda@gestao-fisio.com>`) |
 | `USE_S3`              | —           | `True` salva fotos de perfil no Cloudflare R2; `False` salva em `./media` (padrão: `False`) |
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | ✅ (se `USE_S3`) | Credenciais do token de API do R2 |
 | `R2_BUCKET_NAME`      | ✅ (se `USE_S3`) | Nome do bucket R2                             |
