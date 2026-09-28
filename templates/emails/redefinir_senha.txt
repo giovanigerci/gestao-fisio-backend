@@ -1,0 +1,9 @@
+{% extends "emails/base.txt" %}
+{% block conteudo %}Olá, {{ nome }}!
+
+Recebemos uma solicitação para redefinir a senha da sua conta.
+
+Acesse o link abaixo para criar uma nova senha:
+{{ link }}
+
+Se você não solicitou essa alteração, ignore este e-mail — sua senha continua a mesma. O link só pode ser usado uma vez.{% endblock %}

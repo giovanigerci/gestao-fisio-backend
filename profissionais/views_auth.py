@@ -7,6 +7,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
+from django.template.loader import render_to_string
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -190,20 +191,19 @@ class SolicitarResetSenhaView(APIView):
     def _enviar_link(self, user):
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        link = f'{settings.FRONTEND_URL.rstrip("/")}/redefinir-senha?uid={uid}&token={token}'
+        site_url = settings.FRONTEND_URL.rstrip('/')
+        contexto = {
+            'nome': user.get_full_name() or user.username,
+            'link': f'{site_url}/redefinir-senha?uid={uid}&token={token}',
+            'site_url': site_url,
+        }
 
         try:
             send_mail(
                 subject='Recuperação de Senha — Gestão Fisio',
-                message=(
-                    f'Olá, {user.get_full_name() or user.username}!\n\n'
-                    f'Recebemos uma solicitação para redefinir a senha da sua conta.\n\n'
-                    f'Clique no link abaixo para criar uma nova senha:\n'
-                    f'{link}\n\n'
-                    f'Se você não solicitou essa alteração, ignore este e-mail.\n'
-                    f'O link expira automaticamente após o uso.\n\n'
-                    f'— Equipe Gestão Fisio'
-                ),
+                # Texto puro + HTML: clientes sem suporte a HTML (e filtros de spam) usam o texto
+                message=render_to_string('emails/redefinir_senha.txt', contexto),
+                html_message=render_to_string('emails/redefinir_senha.html', contexto),
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[user.email],
             )

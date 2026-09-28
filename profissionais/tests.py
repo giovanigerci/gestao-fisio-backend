@@ -166,6 +166,31 @@ class RecuperacaoSenhaAPITestCase(TestCase):
         self.assertEqual(mail.outbox[0].from_email, 'Gestão Fisio <nao-responda@gestao-fisio.com>')
         self.extrair_uid_e_token(mail.outbox[0].body)
 
+    def test_email_tem_versao_html_e_texto_com_o_link(self):
+        self.client.post(self.url_solicitar, {'email': 'joao@exemplo.com'})
+        email = mail.outbox[0]
+        html, tipo = email.alternatives[0]
+        uid, token = self.extrair_uid_e_token(email.body)
+
+        self.assertEqual(tipo, 'text/html')
+        self.assertIn('Redefinir senha', html)
+        self.assertIn('Olá, dr_silva!', html)
+        # No HTML o "&" do link é escapado (correto em atributos); no texto puro, não
+        self.assertIn(f'href="https://gestao-fisio.com/redefinir-senha?uid={uid}&amp;token={token}"', html)
+        self.assertIn(f'?uid={uid}&token={token}', email.body)
+        self.assertNotIn('&amp;', email.body)
+        self.assertIn('src="https://gestao-fisio.com/logo.png"', html)
+
+    def test_nome_com_html_e_escapado_no_email(self):
+        self.user.first_name = '<b>Maria</b>'
+        self.user.save()
+
+        self.client.post(self.url_solicitar, {'email': 'joao@exemplo.com'})
+        html, _ = mail.outbox[0].alternatives[0]
+
+        self.assertIn('Olá, &lt;b&gt;Maria&lt;/b&gt;!', html)
+        self.assertNotIn('<b>Maria</b>', html)
+
     def test_email_nao_cadastrado_tem_mesma_resposta_e_nao_envia(self):
         response = self.client.post(self.url_solicitar, {'email': 'ninguem@exemplo.com'})
 
