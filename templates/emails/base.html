@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+{% comment %}
+  Layout padrão dos e-mails do Gestão Fisio.
+  Regras de e-mail HTML: layout em tabelas e estilos inline (muitos clientes, como o Gmail e o
+  Outlook, ignoram CSS externo, flexbox e grid), largura máxima de 600px e fundo claro fixo
+  para o modo escuro dos clientes não inverter as cores da marca.
+  Blocos: titulo, preheader (resumo exibido na caixa de entrada) e conteudo.
+{% endcomment %}
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>{% block titulo %}Gestão Fisio{% endblock %}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f1f5f9;">
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent;">
+    {% block preheader %}{% endblock %}
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;">
+
+          <!-- Cabeçalho com a marca -->
+          <tr>
+            <td align="center" style="background-color:#0b1120; border-radius:12px 12px 0 0; padding:28px 24px;">
+              <img src="{{ site_url }}/logo.png" width="48" height="48" alt="" style="display:block; margin:0 auto 10px; border:0;">
+              <span style="font-family:Arial, Helvetica, sans-serif; font-size:22px; font-weight:bold;">
+                <span style="color:#5383a3;">Gestão</span> <span style="color:#d9a566;">Fisio</span>
+              </span>
+            </td>
+          </tr>
+
+          <!-- Conteúdo -->
+          <tr>
+            <td style="background-color:#ffffff; padding:32px 32px 24px; font-family:Arial, Helvetica, sans-serif; font-size:16px; line-height:1.6; color:#1e293b;">
+              {% block conteudo %}{% endblock %}
+            </td>
+          </tr>
+
+          <!-- Rodapé -->
+          <tr>
+            <td align="center" style="background-color:#ffffff; border-top:1px solid #e2e8f0; border-radius:0 0 12px 12px; padding:20px 32px; font-family:Arial, Helvetica, sans-serif; font-size:12px; line-height:1.5; color:#64748b; text-align:center;">
+              Este é um e-mail automático, não é necessário respondê-lo.<br>
+              <a href="{{ site_url }}" style="color:#467192; text-decoration:none;">Gestão Fisio</a> — agenda e receita para fisioterapeutas.
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{% autoescape off %}{% comment %}Versão em texto puro do layout: sem escape de HTML, para links com "&" saírem intactos.{% endcomment %}{% block conteudo %}{% endblock %}
+
+—
+Gestão Fisio · {{ site_url }}
+Este é um e-mail automático, não é necessário respondê-lo.
+{% endautoescape %}
