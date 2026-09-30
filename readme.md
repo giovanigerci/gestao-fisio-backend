@@ -119,7 +119,8 @@ que lê o `access_token` diretamente do cookie da requisição.
 
 | Método      | Rota                             | Descrição                                       |
 |-------------|----------------------------------|-------------------------------------------------|
-| POST        | `/api/auth/registrar/`           | Cria `User` + `Profissional` numa transação     |
+| POST        | `/api/auth/registrar/enviar-codigo/` | 1ª etapa do cadastro: valida os dados e envia um código de 6 dígitos ao e-mail (não cria a conta; reenvio a cada 60s) |
+| POST        | `/api/auth/registrar/`           | 2ª etapa: com o `codigo` recebido por e-mail, cria `User` + `Profissional` numa transação (código vale 10 min, 5 tentativas) |
 | POST        | `/api/auth/token/`               | Login — define cookies `access_token` + `refresh_token` |
 | POST        | `/api/auth/token/refresh/`       | Renova o `access_token` via `refresh_token` no cookie |
 | POST        | `/api/auth/logout/`              | Invalida o `refresh_token` e limpa os cookies   |
