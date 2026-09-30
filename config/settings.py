@@ -106,7 +106,7 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        'NAME': 'profissionais.validators.LetrasENumerosValidator',
     },
 ]
 
@@ -145,7 +145,8 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
     'DEFAULT_THROTTLE_RATES': {
         'login': '5/minute',
-        'registro': '3/minute',
+        'registro': '5/minute',
+        'codigo_email': '10/hour',
         'password_reset': '3/hour',
     },
 }

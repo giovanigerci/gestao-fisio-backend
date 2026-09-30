@@ -1,0 +1,21 @@
+{% extends "emails/base.html" %}
+
+{% block titulo %}Código de verificação — Gestão Fisio{% endblock %}
+
+{% block preheader %}Seu código de verificação é {{ codigo }}. Ele vale por {{ validade_minutos }} minutos.{% endblock %}
+
+{% block conteudo %}
+<p style="margin:0 0 16px; font-size:20px; font-weight:bold; color:#0f172a;">Confirme seu e-mail</p>
+
+<p style="margin:0 0 24px;">Use o código abaixo para concluir a criação da sua conta no Gestão Fisio:</p>
+
+<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 24px;">
+  <tr>
+    <td align="center" style="background-color:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:16px 28px; font-family:'Courier New', Courier, monospace; font-size:32px; font-weight:bold; letter-spacing:8px; color:#0f172a;">{{ codigo }}</td>
+  </tr>
+</table>
+
+<p style="margin:0 0 8px; font-size:14px; color:#475569; text-align:center;">O código vale por <strong>{{ validade_minutos }} minutos</strong>.</p>
+
+<p style="margin:24px 0 0; font-size:14px; color:#475569;">Se você não está criando uma conta no Gestão Fisio, ignore este e-mail — nenhuma conta será criada.</p>
+{% endblock %}

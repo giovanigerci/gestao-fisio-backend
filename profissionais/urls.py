@@ -3,9 +3,10 @@ from profissionais.views_auth import (
     LogoutView, FotoPerfilView, TrocarSenhaView,
     SolicitarResetSenhaView, RedefinirSenhaView,
 )
-from .views import RegistroView, PerfilView
+from .views import EnviarCodigoCadastroView, RegistroView, PerfilView
 
 urlpatterns = [
+    path('registrar/enviar-codigo/', EnviarCodigoCadastroView.as_view(), name='registrar-enviar-codigo'),
     path('registrar/', RegistroView.as_view(), name='registrar'),
     path('me/', PerfilView.as_view(), name='perfil'),
     path('me/foto/', FotoPerfilView.as_view(), name='perfil-foto'),

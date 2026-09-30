@@ -12,7 +12,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 from rest_framework import status
-from profissionais.models import Profissional
+from datetime import timedelta
+from django.utils import timezone
+from profissionais.models import CodigoVerificacaoEmail, Profissional
+from profissionais.serializers import MENSAGEM_SENHA_FRACA
 
 MEDIA_ROOT_TESTE = tempfile.mkdtemp()
 
@@ -253,3 +256,190 @@ class RecuperacaoSenhaAPITestCase(TestCase):
         response = self.client.post(self.url_solicitar, {'email': 'ninguem@exemplo.com'})
 
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+
+class CadastroComCodigoAPITestCase(TestCase):
+    def setUp(self):
+        cache.clear()  # throttles ficam no cache
+        self.client = APIClient()
+        self.url_codigo = '/api/auth/registrar/enviar-codigo/'
+        self.url_registrar = '/api/auth/registrar/'
+        self.dados = {
+            'username': 'dr_novo',
+            'email': 'Novo@Exemplo.com',
+            'password': 'SenhaForte@123',
+            'telefone': '11999999999',
+            'especialidade': 'Ortopedia',
+            'crefito': '99999-F',
+        }
+
+    def enviar_codigo(self, **alteracoes):
+        return self.client.post(self.url_codigo, {**self.dados, **alteracoes})
+
+    def codigo_do_ultimo_email(self):
+        return re.search(r'\b(\d{6})\b', mail.outbox[-1].body).group(1)
+
+    def codigo_diferente(self, codigo):
+        return '000000' if codigo != '000000' else '111111'
+
+    def voltar_relogio_do_codigo(self, minutos):
+        CodigoVerificacaoEmail.objects.update(criado_em=timezone.now() - timedelta(minutes=minutos))
+
+
+    def test_envia_codigo_sem_criar_a_conta(self):
+        response = self.enviar_codigo()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['novo@exemplo.com'])
+        codigo = self.codigo_do_ultimo_email()
+        self.assertIn(codigo, mail.outbox[0].subject)
+        self.assertIn(codigo, mail.outbox[0].alternatives[0][0])
+        self.assertFalse(User.objects.filter(username='dr_novo').exists())
+
+    def test_codigo_nao_fica_salvo_em_texto_puro(self):
+        self.enviar_codigo()
+
+        registro = CodigoVerificacaoEmail.objects.get()
+        self.assertNotIn(self.codigo_do_ultimo_email(), registro.codigo_hash)
+
+    def test_email_e_obrigatorio(self):
+        dados = {k: v for k, v in self.dados.items() if k != 'email'}
+        response = self.client.post(self.url_codigo, dados)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('email', response.data)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_email_ja_em_uso_ignorando_maiusculas(self):
+        User.objects.create_user(username='outro', email='novo@exemplo.com', password='x')
+
+        response = self.enviar_codigo(email='NOVO@exemplo.com')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['email'], ['Este e-mail já está em uso.'])
+
+    def test_senha_fraca_mostra_uma_unica_mensagem_com_os_requisitos(self):
+        # "123" falha em 3 validadores, mas o usuário vê uma só mensagem dizendo o que fazer
+        response = self.enviar_codigo(password='123')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['password'], [MENSAGEM_SENHA_FRACA])
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_senha_precisa_de_letras_e_numeros(self):
+        for senha in ('somenteletras', '84736251'):
+            with self.subTest(senha=senha):
+                response = self.enviar_codigo(password=senha)
+                self.assertEqual(response.data['password'], [MENSAGEM_SENHA_FRACA])
+
+    def test_senha_com_letras_e_numeros_sem_simbolo_e_aceita(self):
+        response = self.enviar_codigo(password='fisioterapia2026')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_reenvio_so_depois_do_intervalo_e_invalida_o_codigo_anterior(self):
+        self.enviar_codigo()
+        primeiro = self.codigo_do_ultimo_email()
+
+        cedo = self.enviar_codigo()
+        self.assertEqual(cedo.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertGreater(cedo.data['aguardar_segundos'], 0)
+
+        self.voltar_relogio_do_codigo(minutos=2)
+        self.assertEqual(self.enviar_codigo().status_code, status.HTTP_200_OK)
+        self.assertEqual(CodigoVerificacaoEmail.objects.count(), 1)
+        if primeiro != self.codigo_do_ultimo_email():
+            response = self.client.post(self.url_registrar, {**self.dados, 'codigo': primeiro})
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_falha_no_envio_remove_o_codigo_para_tentar_de_novo(self):
+        with patch('profissionais.views.send_mail', side_effect=smtplib.SMTPException('fora do ar')), \
+                self.assertLogs('profissionais.views', level='ERROR'):
+            response = self.enviar_codigo()
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertFalse(CodigoVerificacaoEmail.objects.exists())
+        self.assertEqual(self.enviar_codigo().status_code, status.HTTP_200_OK)
+
+
+    def test_codigo_certo_cria_a_conta_com_o_email(self):
+        self.enviar_codigo()
+
+        response = self.client.post(self.url_registrar, {**self.dados, 'codigo': self.codigo_do_ultimo_email()})
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(username='dr_novo')
+        self.assertEqual(user.email, 'novo@exemplo.com')
+        self.assertTrue(user.check_password('SenhaForte@123'))
+        self.assertTrue(Profissional.objects.filter(usuario=user, crefito='99999-F').exists())
+        self.assertFalse(CodigoVerificacaoEmail.objects.exists())
+
+    def test_sem_codigo_nao_cria_a_conta(self):
+        response = self.client.post(self.url_registrar, self.dados)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('codigo', response.data)
+        self.assertFalse(User.objects.filter(username='dr_novo').exists())
+
+    def test_codigo_errado_nao_cria_a_conta(self):
+        self.enviar_codigo()
+        errado = self.codigo_diferente(self.codigo_do_ultimo_email())
+
+        response = self.client.post(self.url_registrar, {**self.dados, 'codigo': errado})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['codigo'], ['Código inválido ou expirado.'])
+        self.assertFalse(User.objects.filter(username='dr_novo').exists())
+
+    def test_codigo_expirado_nao_cria_a_conta(self):
+        self.enviar_codigo()
+        codigo = self.codigo_do_ultimo_email()
+        self.voltar_relogio_do_codigo(minutos=11)
+
+        response = self.client.post(self.url_registrar, {**self.dados, 'codigo': codigo})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(username='dr_novo').exists())
+
+    def test_codigo_bloqueia_apos_5_tentativas_erradas(self):
+        self.enviar_codigo()
+        codigo = self.codigo_do_ultimo_email()
+        for _ in range(CodigoVerificacaoEmail.MAX_TENTATIVAS):
+            CodigoVerificacaoEmail.verificar('novo@exemplo.com', self.codigo_diferente(codigo))
+
+        response = self.client.post(self.url_registrar, {**self.dados, 'codigo': codigo})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(username='dr_novo').exists())
+
+    def test_codigo_de_outro_email_nao_serve(self):
+        self.enviar_codigo(email='outro@exemplo.com', username='dr_outro', crefito='88888-F')
+        codigo_do_outro = self.codigo_do_ultimo_email()
+
+        response = self.client.post(self.url_registrar, {**self.dados, 'codigo': codigo_do_outro})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(username='dr_novo').exists())
+
+
+class EmailUnicoNoPerfilAPITestCase(TestCase):
+    def setUp(self):
+        User.objects.create_user(username='outro', email='ocupado@exemplo.com', password='x')
+        self.user = User.objects.create_user(username='dr_silva', email='joao@exemplo.com', password='x')
+        Profissional.objects.create(usuario=self.user, telefone='1', especialidade='x', crefito='12345-F')
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_nao_permite_email_de_outra_conta(self):
+        response = self.client.patch('/api/auth/me/', {'email': 'OCUPADO@exemplo.com'})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['email'], ['Este e-mail já está em uso.'])
+
+    def test_permite_manter_o_proprio_email(self):
+        response = self.client.patch('/api/auth/me/', {'email': 'JOAO@exemplo.com'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, 'joao@exemplo.com')

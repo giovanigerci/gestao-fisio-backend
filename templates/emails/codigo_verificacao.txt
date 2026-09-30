@@ -1,0 +1,10 @@
+{% extends "emails/base.txt" %}
+{% block conteudo %}Confirme seu e-mail
+
+Use o código abaixo para concluir a criação da sua conta no Gestão Fisio:
+
+{{ codigo }}
+
+O código vale por {{ validade_minutos }} minutos.
+
+Se você não está criando uma conta no Gestão Fisio, ignore este e-mail — nenhuma conta será criada.{% endblock %}
