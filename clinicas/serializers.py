@@ -12,6 +12,11 @@ class ClinicaSerializer(serializers.ModelSerializer):
                   'valor_por_atendimento', 'ativo', 'total_atendimentos', 'receita_total']
         read_only_fields = ['profissional']
 
+    def validate_valor_por_atendimento(self, value):
+        if value < 0:
+            raise serializers.ValidationError('O valor não pode ser negativo.')
+        return value
+
     def get_total_atendimentos(self, obj):
         if hasattr(obj, 'total_atendimentos'):
             return obj.total_atendimentos
