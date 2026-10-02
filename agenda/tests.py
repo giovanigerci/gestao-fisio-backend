@@ -1,4 +1,4 @@
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 from unittest.mock import patch
 from django.test import TestCase
 from django.contrib.auth.models import User
@@ -85,9 +85,11 @@ class ConfirmarDiaAPITestCase(TestCase):
             status=Agendamento.Status.AGENDADO
         )
 
-        # Mock timezone.localtime().time() para 15:00 (antes das 23:59)
+        # Relógio às 15:00 de hoje no fuso do projeto (antes das 23:59).
+        # Montado a partir da data local: timezone.now().replace(hour=15) usaria a data UTC,
+        # que entre 21h e 0h (UTC-3) já é o dia seguinte — e o teste falhava nesse horário.
         with patch('django.utils.timezone.localtime') as mock_localtime:
-            agora_mock = timezone.now().replace(hour=15, minute=0, second=0)
+            agora_mock = timezone.make_aware(datetime.combine(hoje, time(15, 0)))
             mock_localtime.return_value = agora_mock
             res = self.client.patch(f'/api/agendamentos/confirmar-dia/?data={hoje.strftime("%Y-%m-%d")}')
             self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
