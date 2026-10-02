@@ -13,6 +13,10 @@ class PacienteSerializer(serializers.ModelSerializer):
         fields = ['id', 'profissional', 'nome', 'cpf', 'telefone', 'email', 'data_nascimento', 'endereco', 'historico_medico',
                   'ultima_visita', 'total_sessoes', 'status']
         read_only_fields = ['profissional']
+        extra_kwargs = {
+            'endereco': {'max_length': 255},
+            'historico_medico': {'max_length': 10000},
+        }
 
     def get_total_sessoes(self, obj):
         if hasattr(obj, 'total_sessoes'):
