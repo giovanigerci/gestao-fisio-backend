@@ -333,6 +333,12 @@ class CadastroComCodigoAPITestCase(TestCase):
                 response = self.enviar_codigo(password=senha)
                 self.assertEqual(response.data['password'], [MENSAGEM_SENHA_FRACA])
 
+    def test_senha_acima_de_128_caracteres_e_rejeitada(self):
+        response = self.enviar_codigo(password='Senha1' + 'a' * 123)  # 129 caracteres
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('password', response.data)
+
     def test_senha_com_letras_e_numeros_sem_simbolo_e_aceita(self):
         response = self.enviar_codigo(password='fisioterapia2026')
 

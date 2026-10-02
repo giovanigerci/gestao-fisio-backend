@@ -7,6 +7,8 @@ from .models import CodigoVerificacaoEmail, Profissional
 
 # Mensagem única com todos os requisitos (em vez de uma linha por validador que falhou).
 # Mantenha em sincronia com AUTH_PASSWORD_VALIDATORS e com o componente de requisitos no frontend.
+MAX_SENHA = 128
+
 MENSAGEM_SENHA_FRACA = (
     'A senha deve ter pelo menos 8 caracteres, com letras e números, '
     'e não pode ser uma senha comum nem parecida com seu nome de usuário.'
@@ -38,7 +40,7 @@ def validar_email_unico(email, excluir_usuario=None):
 class RegistroSerializer(serializers.Serializer):
     username = serializers.CharField()
     email = serializers.EmailField()
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True, max_length=MAX_SENHA)
     telefone = serializers.CharField(max_length=20)
     especialidade = serializers.CharField(max_length=100)
     crefito = serializers.CharField(max_length=15)
@@ -165,9 +167,9 @@ class FotoPerfilSerializer(serializers.Serializer):
         return value
 
 class TrocarSenhaSerializer(serializers.Serializer):
-    senha_atual = serializers.CharField(write_only=True)
-    nova_senha = serializers.CharField(write_only=True)
-    confirmar_senha = serializers.CharField(write_only=True)
+    senha_atual = serializers.CharField(write_only=True, max_length=MAX_SENHA)
+    nova_senha = serializers.CharField(write_only=True, max_length=MAX_SENHA)
+    confirmar_senha = serializers.CharField(write_only=True, max_length=MAX_SENHA)
 
     def validate_senha_atual(self, value):
         user = self.context['request'].user
@@ -183,8 +185,8 @@ class TrocarSenhaSerializer(serializers.Serializer):
         return data
 
 class RedefinirSenhaSerializer(serializers.Serializer):
-    nova_senha = serializers.CharField(write_only=True)
-    confirmar_senha = serializers.CharField(write_only=True)
+    nova_senha = serializers.CharField(write_only=True, max_length=MAX_SENHA)
+    confirmar_senha = serializers.CharField(write_only=True, max_length=MAX_SENHA)
 
     def validate(self, data):
         if data['nova_senha'] != data['confirmar_senha']:
