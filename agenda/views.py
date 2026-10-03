@@ -15,7 +15,7 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = Agendamento.objects.filter(
             profissional=self.request.user.profissional
-        ).select_related('paciente', 'clinica')
+        ).select_related('paciente', 'clinica').order_by('data', 'hora_inicio', 'id')
 
         data_inicio = self.request.query_params.get('data_inicio')
         data_fim = self.request.query_params.get('data_fim')
