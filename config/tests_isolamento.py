@@ -168,7 +168,7 @@ class IsolamentoEntreProfissionaisTestCase(TestCase):
 
     def test_resumo_financeiro_nao_inclui_receita_de_outro_profissional(self):
         Agendamento.objects.filter(id__in=[self.agendamento_a.id, self.agendamento_b.id]).update(
-            status=Agendamento.Status.REALIZADO
+            status=Agendamento.Status.REALIZADO, valor_cobrado=Agendamento.expressao_valor_a_cobrar()
         )
 
         response = self.client.get('/api/resumo-financeiro/', {'periodo': 'mes', 'data': str(self.ontem)})

@@ -24,6 +24,8 @@ class AgendamentoSerializer(serializers.ModelSerializer):
         return ""
 
     def get_valor_calculado(self, obj):
+        if obj.valor_cobrado is not None:
+            return obj.valor_cobrado
         if obj.eh_experimental:
             return 0
         return obj.clinica.valor_por_atendimento

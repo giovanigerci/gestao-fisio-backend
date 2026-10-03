@@ -125,7 +125,7 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
             )
 
         with transaction.atomic():
-            pendentes.update(status=Agendamento.Status.REALIZADO)
+            pendentes.update(status=Agendamento.Status.REALIZADO, valor_cobrado=Agendamento.expressao_valor_a_cobrar())
 
         agendamentos_atualizados = Agendamento.objects.filter(
             profissional=profissional,

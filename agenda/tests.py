@@ -1,4 +1,5 @@
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 from unittest.mock import patch
 from django.test import TestCase
 from django.contrib.auth.models import User
@@ -200,3 +201,129 @@ class ConfirmarDiaAPITestCase(TestCase):
         # Agendamento do profissional 2 continua intacto como AGENDADO
         ag_outro.refresh_from_db()
         self.assertEqual(ag_outro.status, Agendamento.Status.AGENDADO)
+
+
+class ValorCobradoTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='dr_valor', password='x')
+        self.profissional = Profissional.objects.create(
+            usuario=self.user, telefone='1', especialidade='x', crefito='VALOR-F'
+        )
+        self.clinica = Clinica.objects.create(
+            profissional=self.profissional, nome='Clínica 40', endereco='Rua', valor_por_atendimento=Decimal('40.00')
+        )
+        self.outra_clinica = Clinica.objects.create(
+            profissional=self.profissional, nome='Clínica 100', endereco='Rua', valor_por_atendimento=Decimal('100.00')
+        )
+        self.pacientes = [
+            Paciente.objects.create(profissional=self.profissional, nome=f'P{i}', cpf=f'999.999.999-0{i}', telefone='1')
+            for i in range(3)
+        ]
+        self.ontem = timezone.localdate() - timedelta(days=1)
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def agendar(self, paciente=None, clinica=None, experimental=False, hora=9):
+        return Agendamento.objects.create(
+            profissional=self.profissional, clinica=clinica or self.clinica, paciente=paciente or self.pacientes[0],
+            data=self.ontem, hora_inicio=time(hora, 0), hora_fim=time(hora + 1, 0), eh_experimental=experimental,
+        )
+
+    def patch(self, agendamento, **dados):
+        response = self.client.patch(f'/api/agendamentos/{agendamento.id}/', dados)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        agendamento.refresh_from_db()
+        return response
+
+    def reajustar(self, clinica, valor):
+        clinica.valor_por_atendimento = Decimal(valor)
+        clinica.save()
+
+    def test_agendado_nao_tem_valor_congelado(self):
+        agendamento = self.agendar()
+
+        self.assertIsNone(agendamento.valor_cobrado)
+
+    def test_confirmar_congela_o_valor_e_reajuste_nao_altera(self):
+        agendamento = self.agendar()
+        self.patch(agendamento, status='RE')
+        self.reajustar(self.clinica, '60.00')
+
+        response = self.client.get(f'/api/agendamentos/{agendamento.id}/')
+
+        self.assertEqual(agendamento.valor_cobrado, Decimal('40.00'))
+        self.assertEqual(response.data['valor_calculado'], Decimal('40.00'))
+
+    def test_agendado_acompanha_o_valor_atual_da_clinica(self):
+        agendamento = self.agendar()
+        self.reajustar(self.clinica, '60.00')
+
+        response = self.client.get(f'/api/agendamentos/{agendamento.id}/')
+
+        self.assertEqual(response.data['valor_calculado'], Decimal('60.00'))
+
+    def test_experimental_realizado_congela_zero(self):
+        agendamento = self.agendar(experimental=True)
+
+        self.patch(agendamento, status='RE')
+
+        self.assertEqual(agendamento.valor_cobrado, Decimal('0.00'))
+
+    def test_desfazer_a_confirmacao_limpa_o_valor(self):
+        agendamento = self.agendar()
+        self.patch(agendamento, status='RE')
+        self.reajustar(self.clinica, '60.00')
+
+        self.patch(agendamento, status='AG')
+        self.assertIsNone(agendamento.valor_cobrado)
+
+        self.patch(agendamento, status='RE')  # reconfirmado depois do reajuste: vale o preço novo
+        self.assertEqual(agendamento.valor_cobrado, Decimal('60.00'))
+
+    def test_corrigir_clinica_ou_experimental_de_realizado_recalcula(self):
+        agendamento = self.agendar()
+        self.patch(agendamento, status='RE')
+
+        self.patch(agendamento, clinica=self.outra_clinica.id)
+        self.assertEqual(agendamento.valor_cobrado, Decimal('100.00'))
+
+        self.patch(agendamento, eh_experimental=True)
+        self.assertEqual(agendamento.valor_cobrado, Decimal('0.00'))
+
+    def test_editar_outro_campo_de_realizado_nao_recalcula(self):
+        agendamento = self.agendar()
+        self.patch(agendamento, status='RE')
+        self.reajustar(self.clinica, '60.00')
+
+        self.patch(agendamento, hora_inicio='10:00', hora_fim='11:00')
+
+        self.assertEqual(agendamento.valor_cobrado, Decimal('40.00'))
+
+    def test_confirmar_dia_congela_o_valor_de_cada_clinica_em_um_unico_update(self):
+        normal = self.agendar(self.pacientes[0], self.clinica, hora=8)
+        outra = self.agendar(self.pacientes[1], self.outra_clinica, hora=9)
+        experimental = self.agendar(self.pacientes[2], self.clinica, experimental=True, hora=10)
+
+        response = self.client.patch(f'/api/agendamentos/confirmar-dia/?data={self.ontem}')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        valores = {a.id: a.valor_cobrado for a in Agendamento.objects.filter(id__in=[normal.id, outra.id, experimental.id])}
+        self.assertEqual(valores, {normal.id: Decimal('40.00'), outra.id: Decimal('100.00'), experimental.id: Decimal('0.00')})
+
+    def test_migration_preenche_realizados_antigos_com_o_valor_atual(self):
+        from importlib import import_module
+        from django.apps import apps
+
+        realizado = self.agendar(self.pacientes[0], self.outra_clinica, hora=8)
+        experimental = self.agendar(self.pacientes[1], experimental=True, hora=9)
+        agendado = self.agendar(self.pacientes[2], hora=10)
+        # Simula dados anteriores ao campo: realizados sem valor congelado
+        Agendamento.objects.filter(id__in=[realizado.id, experimental.id]).update(status='RE', valor_cobrado=None)
+
+        migration = import_module('agenda.migrations.0006_agendamento_valor_cobrado')
+        migration.congelar_valor_dos_realizados(apps, None)
+
+        valores = dict(Agendamento.objects.values_list('id', 'valor_cobrado'))
+        self.assertEqual(valores[realizado.id], Decimal('100.00'))
+        self.assertEqual(valores[experimental.id], Decimal('0.00'))
+        self.assertIsNone(valores[agendado.id])
