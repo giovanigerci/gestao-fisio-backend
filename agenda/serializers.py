@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 from .models import Agendamento
 
@@ -16,8 +17,7 @@ class AgendamentoSerializer(serializers.ModelSerializer):
 
     def get_idade_paciente(self, obj):
         if obj.paciente and obj.paciente.data_nascimento:
-            from datetime import date
-            hoje = date.today()
+            hoje = timezone.localdate()
             nasc = obj.paciente.data_nascimento
             idade = hoje.year - nasc.year - ((hoje.month, hoje.day) < (nasc.month, nasc.day))
             return f"{idade} Anos"

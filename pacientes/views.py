@@ -1,4 +1,5 @@
-from datetime import date, timedelta
+from datetime import timedelta
+from django.utils import timezone
 from django.db.models import Count, Max, Exists, OuterRef, Case, When, Value, CharField, Q
 from rest_framework import viewsets, filters
 from rest_framework.decorators import action
@@ -15,7 +16,7 @@ class PacienteViewSet(viewsets.ModelViewSet):
     ordering = ['nome']
 
     def get_queryset(self):
-        hoje = date.today()
+        hoje = timezone.localdate()
         limite_recente = hoje - timedelta(days=60)
 
         recente_subquery = Agendamento.objects.filter(

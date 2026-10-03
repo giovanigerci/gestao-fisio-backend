@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from agenda.models import Agendamento
-from datetime import date, timedelta
+from datetime import timedelta
+from django.utils import timezone
 from .models import Paciente
 
 class PacienteSerializer(serializers.ModelSerializer):
@@ -32,16 +33,17 @@ class PacienteSerializer(serializers.ModelSerializer):
     def get_status(self, obj):
         if hasattr(obj, 'status'):
             return obj.status
-        limite = date.today() - timedelta(days=60)
+        limite = timezone.localdate() - timedelta(days=60)
         tem_recente = Agendamento.objects.filter(paciente=obj, status='RE', data__gte=limite).exists()
-        tem_futuro = Agendamento.objects.filter(paciente=obj, status='AG', data__gte=date.today()).exists()
+        tem_futuro = Agendamento.objects.filter(paciente=obj, status='AG', data__gte=timezone.localdate()).exists()
         return 'Ativo' if (tem_recente or tem_futuro) else 'Inativo'
 
     def validate_data_nascimento(self, value):
         if value:
-            if value > date.today():
+            hoje = timezone.localdate()
+            if value > hoje:
                 raise serializers.ValidationError("Data de nascimento não pode ser maior que a data atual.")
-            limite_antigo = date.today().replace(year=date.today().year - 120)
+            limite_antigo = hoje.replace(year=hoje.year - 120)
             if value < limite_antigo:
                 raise serializers.ValidationError("Data de nascimento inválida.")
         return value
