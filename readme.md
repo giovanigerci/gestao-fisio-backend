@@ -235,7 +235,7 @@ Todas as variáveis estão documentadas em `.env.example`. As principais:
 
 ## Próximos passos
 
-- [ ] Cobertura de testes automatizados (regras de cálculo de receita e isolamento multi-tenant)
+- [x] Cobertura de testes automatizados das regras centrais: cálculo de receita (`financeiro/tests.py`) e isolamento multi-tenant (`config/tests_isolamento.py`)
 - [ ] Pipeline de CI via GitHub Actions
 - [ ] Documentação OpenAPI/Swagger
 - [x] Migrar armazenamento de mídia (fotos de perfil) para serviço externo (Cloudflare R2, via `django-storages`) — necessário para plataformas com filesystem efêmero
