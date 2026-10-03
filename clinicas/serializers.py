@@ -1,3 +1,4 @@
+from django.db.models import Sum
 from rest_framework import serializers
 from .models import Clinica
 from agenda.models import Agendamento
@@ -23,5 +24,6 @@ class ClinicaSerializer(serializers.ModelSerializer):
         return Agendamento.objects.filter(clinica=obj, status='RE').count()
 
     def get_receita_total(self, obj):
-        total = self.get_total_atendimentos(obj)
-        return obj.valor_por_atendimento * total
+        if hasattr(obj, 'receita_total'):
+            return obj.receita_total or 0
+        return Agendamento.objects.filter(clinica=obj, status='RE').aggregate(total=Sum('valor_cobrado'))['total'] or 0

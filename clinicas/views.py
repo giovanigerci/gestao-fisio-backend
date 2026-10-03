@@ -1,4 +1,4 @@
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -17,7 +17,9 @@ class ClinicaViewSet(viewsets.ModelViewSet):
         return Clinica.objects.filter(
             profissional=self.request.user.profissional
         ).annotate(
-            total_atendimentos=Count('agendamento', filter=Q(agendamento__status=Agendamento.Status.REALIZADO))
+            total_atendimentos=Count('agendamento', filter=Q(agendamento__status=Agendamento.Status.REALIZADO)),
+            # Soma do valor congelado (experimental = 0) na mesma consulta da listagem
+            receita_total=Sum('agendamento__valor_cobrado', filter=Q(agendamento__status=Agendamento.Status.REALIZADO)),
         )
 
     def perform_create(self, serializer):
