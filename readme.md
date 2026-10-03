@@ -55,17 +55,26 @@ mesmo horário de início — o que permite representar atendimentos em grupo (P
 horário. A receita de um bloco é:
 
 ```
-receita_do_bloco = valor_por_atendimento × count(agendamentos do bloco, excluindo eh_experimental=True)
+receita_do_bloco = soma(valor_cobrado dos agendamentos realizados do bloco)
+valor_cobrado    = valor_por_atendimento da clínica no momento da confirmação (0 se eh_experimental)
 ```
 
 **Exemplo:** às 14h, o profissional atende 3 pacientes na Clínica X (`valor_por_atendimento = R$ 40`),
-sendo um deles uma sessão experimental. A receita do bloco é `R$ 80` (2 pacientes não-experimentais),
-calculada em tempo real — nunca persistida no banco, já que é um dado derivado que pode mudar se o
-valor por atendimento da clínica for reajustado.
+sendo um deles uma sessão experimental. A receita do bloco é `R$ 80` (2 × R$ 40 + R$ 0).
 
-O endpoint de resumo financeiro usa agregação agrupada do ORM (`values()` + `annotate()` +
-`F()` + `TruncWeek`/`TruncMonth`) para consolidar a receita por clínica e por período,
-sem trazer os registros para a aplicação e calcular em Python.
+**Valor congelado na confirmação.** Na primeira versão a receita era calculada sempre com o valor
+*atual* da clínica — simples, mas um reajuste reescrevia o passado: quem atendeu a R$ 40 em 2025 e
+reajustou para R$ 60 veria 2025 como se tivesse cobrado R$ 60. Com o histórico de receita por
+mês/ano isso deixou de ser aceitável, então cada agendamento passou a guardar o `valor_cobrado`,
+congelado quando vira **Realizado** (no `save()` do model e, na confirmação em lote do dia, no próprio
+`UPDATE`). Enquanto está agendado, vale o preço atual da clínica — um reajuste afeta o que ainda vai
+acontecer, nunca o que já aconteceu. Os atendimentos anteriores à mudança foram preenchidos com o
+valor da clínica na época da migração (o histórico de preços nunca tinha sido guardado).
+
+**Consultas do financeiro.** Cada endpoint faz uma única consulta agregada no banco
+(`values()` + `annotate()` com `Sum`/`Count` filtrados e `TruncMonth`/`TruncYear`), apoiada no
+índice `(profissional, status, data)` — sem trazer os registros para a aplicação nem fazer uma
+consulta por dia ou por clínica. Os testes garantem isso com `assertNumQueries`.
 
 ## Modelagem de dados
 
@@ -83,6 +92,7 @@ User (nativo do Django)
               - status ('AG' Agendado | 'RE' Realizado | 'CA' Cancelado)
               - eh_experimental (boolean)
               - grupo_recorrencia (UUID, nullable — para séries de recorrência)
+              - valor_cobrado (decimal, nullable — congelado quando o atendimento é realizado)
 ```
 
 A sessão experimental **não é um tipo de evento separado** — é um `Agendamento` comum marcado com
@@ -158,7 +168,11 @@ que lê o `access_token` diretamente do cookie da requisição.
 | Método | Rota                                          | Descrição                                  |
 |--------|-----------------------------------------------|--------------------------------------------|
 | GET    | `/api/resumo-financeiro/?periodo=mes`         | Receita agregada por clínica (mês atual)   |
-| GET    | `/api/resumo-financeiro/?periodo=semana`      | Receita agregada por clínica (semana atual)|
+| GET    | `/api/resumo-financeiro/?periodo=semana`      | Receita agregada por clínica (semana atual, domingo a sábado)|
+| GET    | `/api/resumo-financeiro/evolucao/?periodo=mes\|semana&data=` | Série diária: realizado, acumulado e previsto (agendamentos ainda não realizados), mais o período anterior para comparação |
+| GET    | `/api/resumo-financeiro/historico/?agrupar=mes\|ano&data=`   | Receita dos últimos 12 meses (ou por ano), comparada com o período anterior, com total, média, melhor período e variação |
+
+Todos aceitam `data=AAAA-MM-DD` (padrão: hoje, no fuso `America/Sao_Paulo`); parâmetros inválidos respondem 400.
 
 Todas as rotas de domínio e financeiro exigem autenticação — o `access_token` deve estar presente
 no cookie da requisição (enviado automaticamente pelo navegador quando `credentials: include`).
