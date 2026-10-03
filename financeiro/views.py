@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from django.utils import timezone
 import calendar
 from django.db.models import Count, F
 from rest_framework.views import APIView
@@ -13,10 +14,10 @@ class ResumoFinanceiroView(APIView):
         if data_str:
             hoje = date.fromisoformat(data_str)
         else:
-            hoje = date.today()
+            hoje = timezone.localdate()
 
         if periodo == 'semana':
-            inicio = hoje - timedelta(days=hoje.weekday())
+            inicio = hoje - timedelta(days=(hoje.weekday() + 1) % 7)
             fim = inicio + timedelta(days=6)
         else: 
             inicio = hoje.replace(day=1)
