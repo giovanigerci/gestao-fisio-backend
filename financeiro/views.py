@@ -75,7 +75,7 @@ class ResumoFinanceiroView(FinanceiroView):
         resumo = list(
             self.atendimentos(request)
             .filter(status=REALIZADO, eh_experimental=False, data__range=(inicio, fim))
-            .values('clinica', 'clinica__nome')
+            .values('clinica', 'clinica__nome', 'clinica__cor')
             .annotate(total_atendimentos=Count('id'), receita_total=Coalesce(Sum('valor_cobrado'), ZERO))
             .order_by('clinica__nome')
         )

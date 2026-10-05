@@ -6,13 +6,14 @@ class AgendamentoSerializer(serializers.ModelSerializer):
     valor_calculado = serializers.SerializerMethodField()
     nome_paciente = serializers.CharField(source='paciente.nome', read_only=True)
     nome_clinica = serializers.CharField(source='clinica.nome', read_only=True)
+    cor_clinica = serializers.IntegerField(source='clinica.cor', read_only=True)
     idade_paciente = serializers.SerializerMethodField()
 
     class Meta:
         model = Agendamento
         fields = ['id', 'profissional', 'clinica', 'paciente', 'data', 'hora_inicio',
                    'hora_fim', 'status', 'eh_experimental', 'valor_calculado',
-                   'nome_paciente', 'nome_clinica', 'idade_paciente']
+                   'nome_paciente', 'nome_clinica', 'cor_clinica', 'idade_paciente']
         read_only_fields = ['profissional']
 
     def get_idade_paciente(self, obj):
