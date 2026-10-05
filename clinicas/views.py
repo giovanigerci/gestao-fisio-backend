@@ -28,4 +28,4 @@ class ClinicaViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def opcoes(self, request):
         clinicas = Clinica.objects.filter(profissional=request.user.profissional)
-        return Response(list(clinicas.values('id', 'nome')))
+        return Response(list(clinicas.values('id', 'nome', 'cor')))

@@ -10,8 +10,8 @@ class ClinicaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Clinica
         fields = ['id', 'profissional', 'nome', 'endereco', 'telefone',
-                  'valor_por_atendimento', 'ativo', 'total_atendimentos', 'receita_total']
-        read_only_fields = ['profissional']
+                  'valor_por_atendimento', 'ativo', 'cor', 'total_atendimentos', 'receita_total']
+        read_only_fields = ['profissional', 'cor']
 
     def validate_valor_por_atendimento(self, value):
         if value < 0:
