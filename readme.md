@@ -148,6 +148,8 @@ que lê o `access_token` diretamente do cookie da requisição.
 | GET/PUT/PATCH/DELETE | `/api/clinicas/{id}/`  | Detalhe, atualização e remoção               |
 | GET             | `/api/clinicas/opcoes/`     | Lista simplificada (id, nome, cor) para selects |
 
+A listagem traz, além dos dados da clínica, `cor` (1 a 5, escolhida pelo sistema na criação, sem repetir entre as clínicas do profissional), `atendimentos_mes` e `receita_mes` (realizados não experimentais no mês atual, mesma regra do resumo financeiro). Clínicas inativas vêm no fim.
+
 ### Pacientes (`/api/pacientes/`)
 
 | Método          | Rota                        | Descrição                                    |
