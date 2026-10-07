@@ -1,9 +1,10 @@
-from datetime import date, time
+from datetime import date, time, timedelta
 from decimal import Decimal
 from django.contrib.auth.models import User
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 from agenda.models import Agendamento
 from clinicas.models import Clinica
 from pacientes.models import Paciente
@@ -64,6 +65,48 @@ class ReceitaNaListagemDeClinicasTestCase(TestCase):
 
         self.assertEqual(item['receita_total'], Decimal('40.00'))
         self.assertEqual(item['total_atendimentos'], 2)
+
+    def test_numeros_do_mes_seguem_a_regra_do_resumo_financeiro(self):
+        clinica = self.criar_clinica('Studio', '40.00')
+        hoje = timezone.localdate()
+        mes_passado = hoje.replace(day=1) - timedelta(days=1)
+
+        def agendar(data, hora, status='RE', experimental=False):
+            Agendamento.objects.create(
+                profissional=self.profissional, clinica=clinica, paciente=self.paciente, data=data,
+                hora_inicio=time(hora, 0), hora_fim=time(hora + 1, 0), status=status, eh_experimental=experimental,
+            )
+
+        agendar(hoje, 8)
+        agendar(hoje, 9)
+        agendar(hoje, 10, experimental=True)  # não conta: experimental
+        agendar(hoje, 11, status='AG')  # não conta: ainda não realizado
+        agendar(mes_passado, 8)  # não conta: outro mês
+
+        item = self.client.get('/api/clinicas/').data['results'][0]
+
+        self.assertEqual(item['atendimentos_mes'], 2)
+        self.assertEqual(item['receita_mes'], Decimal('80.00'))
+        self.assertEqual(item['total_atendimentos'], 4)  # o total desde sempre continua igual
+
+    def test_clinicas_inativas_ficam_no_fim_da_lista(self):
+        self.criar_clinica('Alfa', '40.00')
+        inativa = self.criar_clinica('Aaa inativa', '40.00')
+        inativa.ativo = False
+        inativa.save()
+        self.criar_clinica('Beta', '40.00')
+
+        nomes = [c['nome'] for c in self.client.get('/api/clinicas/').data['results']]
+
+        self.assertEqual(nomes, ['Alfa', 'Beta', 'Aaa inativa'])
+
+    def test_clinica_sem_atendimentos_no_mes_mostra_zero(self):
+        self.criar_clinica('Nova', '40.00')
+
+        item = self.client.get('/api/clinicas/').data['results'][0]
+
+        self.assertEqual(item['atendimentos_mes'], 0)
+        self.assertEqual(item['receita_mes'], 0)
 
     def test_numero_de_consultas_nao_cresce_com_o_numero_de_clinicas(self):
         def consultas_da_listagem():
