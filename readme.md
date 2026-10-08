@@ -163,7 +163,9 @@ A listagem traz, além dos dados da clínica, `cor` (1 a 5, escolhida pelo siste
 |-----------------|--------------------------------|---------------------------------------------------|
 | GET / POST      | `/api/agendamentos/`           | Lista agendamentos (filtráveis por data, clínica) ou cria |
 | GET/PUT/PATCH/DELETE | `/api/agendamentos/{id}/` | Detalhe, atualização e remoção                    |
-| POST            | `/api/agendamentos/` (com `recorrencia`) | Cria série de agendamentos recorrentes |
+| POST            | `/api/agendamentos/recorrente/` | Cria a sessão e repete toda semana (`repeticoes` de 1 a 12); datas em que o paciente já tem sessão no mesmo horário são puladas e voltam em `agendamentos_conflitantes` |
+| GET             | `/api/agendamentos/verificar-recorrencia/?paciente=&data=&hora_inicio=&repeticoes=` | Prévia da recorrente, sem criar nada: `{datas: [{data, conflito}]}` |
+| PATCH           | `/api/agendamentos/confirmar-dia/?data=` | Marca como realizados os agendamentos pendentes do dia (congela o valor cobrado) |
 
 ### Financeiro
 
