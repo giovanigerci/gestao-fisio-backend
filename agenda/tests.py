@@ -327,3 +327,80 @@ class ValorCobradoTestCase(TestCase):
         self.assertEqual(valores[realizado.id], Decimal('100.00'))
         self.assertEqual(valores[experimental.id], Decimal('0.00'))
         self.assertIsNone(valores[agendado.id])
+
+
+class VerificarRecorrenciaTestCase(TestCase):
+    URL = '/api/agendamentos/verificar-recorrencia/'
+
+    def setUp(self):
+        user = User.objects.create_user(username='dr_recorrencia', password='x')
+        self.profissional = Profissional.objects.create(usuario=user, telefone='1', especialidade='x', crefito='REC-F')
+        self.clinica = Clinica.objects.create(profissional=self.profissional, nome='C', endereco='R', valor_por_atendimento=50)
+        self.paciente = Paciente.objects.create(profissional=self.profissional, nome='Ana', cpf='1', telefone='1')
+        self.outro_paciente = Paciente.objects.create(profissional=self.profissional, nome='Bruno', cpf='2', telefone='2')
+        self.client = APIClient()
+        self.client.force_authenticate(user=user)
+
+    def agendar(self, paciente, data, hora=8, status='AG'):
+        return Agendamento.objects.create(
+            profissional=self.profissional, clinica=self.clinica, paciente=paciente, data=data,
+            hora_inicio=time(hora, 0), hora_fim=time(hora + 1, 0), status=status,
+        )
+
+    def verificar(self, **parametros):
+        padrao = {'paciente': self.paciente.id, 'data': '2026-10-05', 'hora_inicio': '08:00', 'repeticoes': 4}
+        return self.client.get(self.URL, {**padrao, **parametros})
+
+    def test_lista_as_datas_semanais_e_marca_as_ocupadas(self):
+        self.agendar(self.paciente, date(2026, 10, 19))
+
+        response = self.verificar()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [(str(d['data']), d['conflito']) for d in response.data['datas']],
+            [('2026-10-05', False), ('2026-10-12', False), ('2026-10-19', True), ('2026-10-26', False)],
+        )
+
+    def test_mesma_regra_da_criacao_recorrente(self):
+        self.agendar(self.paciente, date(2026, 10, 12), status='CA')  # cancelada libera o horário
+        self.agendar(self.paciente, date(2026, 10, 19), hora=9)  # outro horário não conflita
+        self.agendar(self.outro_paciente, date(2026, 10, 26))  # outro paciente no mesmo horário não conflita
+
+        conflitos = [d['conflito'] for d in self.verificar().data['datas']]
+
+        self.assertEqual(conflitos, [False, False, False, False])
+
+    def test_nao_cria_nada(self):
+        antes = Agendamento.objects.count()
+
+        self.verificar(repeticoes=12)
+
+        self.assertEqual(Agendamento.objects.count(), antes)
+
+    def test_numero_de_consultas_nao_cresce_com_as_semanas(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        def consultas(repeticoes):
+            with CaptureQueriesContext(connection) as contexto:
+                self.verificar(repeticoes=repeticoes)
+            return len(contexto)
+
+        self.assertEqual(consultas(12), consultas(1))
+
+    def test_paciente_de_outro_profissional_e_recusado(self):
+        outro_user = User.objects.create_user(username='dr_outro_rec', password='x')
+        outro = Profissional.objects.create(usuario=outro_user, telefone='1', especialidade='x', crefito='OUT-F')
+        alheio = Paciente.objects.create(profissional=outro, nome='Alheio', cpf='3', telefone='3')
+
+        response = self.verificar(paciente=alheio.id)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('paciente', response.data)
+
+    def test_semanas_fora_do_limite_e_parametros_invalidos(self):
+        self.assertEqual(self.verificar(repeticoes=13).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.verificar(repeticoes=0).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.verificar(data='05/10/2026').status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.client.get(self.URL).status_code, status.HTTP_400_BAD_REQUEST)

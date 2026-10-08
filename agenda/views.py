@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.validators import UniqueTogetherValidator
 from .models import Agendamento
-from .serializers import AgendamentoSerializer
+from .serializers import AgendamentoSerializer, VerificarRecorrenciaSerializer
 
 class AgendamentoViewSet(viewsets.ModelViewSet):
     serializer_class = AgendamentoSerializer
@@ -81,6 +81,20 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
             'agendamentos_criados': agendamentos_criados,
             'agendamentos_conflitantes': agendamentos_conflitantes},
             status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'], url_path='verificar-recorrencia')
+    def verificar_recorrencia(self, request):
+        parametros = VerificarRecorrenciaSerializer(data=request.query_params, context={'request': request})
+        parametros.is_valid(raise_exception=True)
+        dados = parametros.validated_data
+
+        datas = [dados['data'] + timedelta(weeks=i) for i in range(dados['repeticoes'])]
+        ocupadas = set(
+            Agendamento.objects.filter(paciente=dados['paciente'], hora_inicio=dados['hora_inicio'], data__in=datas)
+            .exclude(status=Agendamento.Status.CANCELADO)
+            .values_list('data', flat=True)
+        )
+        return Response({'datas': [{'data': data, 'conflito': data in ocupadas} for data in datas]})
 
     @action(detail=False, methods=['patch'], url_path='confirmar-dia')
     def confirmar_dia(self, request):

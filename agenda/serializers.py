@@ -1,5 +1,6 @@
 from django.utils import timezone
 from rest_framework import serializers
+from pacientes.models import Paciente
 from .models import Agendamento
 
 class AgendamentoSerializer(serializers.ModelSerializer):
@@ -43,3 +44,14 @@ class AgendamentoSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Você não pode agendar um paciente que não pertence a você.")
 
         return dados
+
+
+class VerificarRecorrenciaSerializer(serializers.Serializer):
+    paciente = serializers.PrimaryKeyRelatedField(queryset=Paciente.objects.none())
+    data = serializers.DateField()
+    hora_inicio = serializers.TimeField()
+    repeticoes = serializers.IntegerField(min_value=1, max_value=12)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['paciente'].queryset = Paciente.objects.filter(profissional=self.context['request'].user.profissional)
