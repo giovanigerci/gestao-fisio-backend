@@ -115,16 +115,20 @@ class RefreshCookieView(TokenRefreshView):
 
         return response
 
+def remover_cookies_de_sessao(response):
+    """Apaga os cookies de access e refresh (logout e exclusão de conta)."""
+    response.delete_cookie('access_token', path='/api/', domain=settings.COOKIE_DOMAIN, samesite=settings.COOKIE_SAMESITE)
+    response.cookies['access_token']['secure'] = settings.COOKIE_SECURE
+    response.delete_cookie('refresh_token', path='/api/auth/token/refresh/', domain=settings.COOKIE_DOMAIN, samesite=settings.COOKIE_SAMESITE)
+    response.cookies['refresh_token']['secure'] = settings.COOKIE_SECURE
+    return response
+
+
 class LogoutView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        response = Response({'detail': 'Logout realizado com sucesso.'})
-        response.delete_cookie('access_token', path='/api/', domain=settings.COOKIE_DOMAIN, samesite=settings.COOKIE_SAMESITE)
-        response.cookies['access_token']['secure'] = settings.COOKIE_SECURE
-        response.delete_cookie('refresh_token', path='/api/auth/token/refresh/', domain=settings.COOKIE_DOMAIN, samesite=settings.COOKIE_SAMESITE)
-        response.cookies['refresh_token']['secure'] = settings.COOKIE_SECURE
-        return response
+        return remover_cookies_de_sessao(Response({'detail': 'Logout realizado com sucesso.'}))
 
 class FotoPerfilView(APIView):
     permission_classes = [IsAuthenticated]

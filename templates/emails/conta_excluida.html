@@ -1,0 +1,17 @@
+{% extends "emails/base.html" %}
+
+{% block titulo %}Conta excluída — Gestão Fisio{% endblock %}
+
+{% block preheader %}Sua conta e todos os dados dela foram apagados de forma definitiva.{% endblock %}
+
+{% block conteudo %}
+<p style="margin:0 0 16px; font-size:20px; font-weight:bold; color:#0f172a;">Olá, {{ nome }}!</p>
+
+<p style="margin:0 0 16px;">Sua conta no Gestão Fisio foi excluída, como você solicitou.</p>
+
+<p style="margin:0 0 24px;">Seu cadastro, suas clínicas, seus pacientes e suas sessões foram apagados de forma definitiva e não podem ser recuperados.</p>
+
+<p style="margin:0 0 24px; font-size:14px; color:#475569;">Lembre-se: a guarda dos prontuários pelo prazo exigido pelo seu conselho profissional continua sendo sua responsabilidade. Guarde em local seguro o arquivo de exportação, se você o baixou.</p>
+
+<p style="margin:0; font-size:14px; color:#475569;">Se não foi você quem pediu a exclusão, fale com o encarregado de dados pelo canal indicado na <a href="{{ site_url }}/privacidade" target="_blank" style="color:#467192; font-weight:bold;">Política de Privacidade</a>.</p>
+{% endblock %}

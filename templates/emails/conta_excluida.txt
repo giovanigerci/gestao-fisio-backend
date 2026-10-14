@@ -1,0 +1,10 @@
+{% extends "emails/base.txt" %}
+{% block conteudo %}Olá, {{ nome }}!
+
+Sua conta no Gestão Fisio foi excluída, como você solicitou.
+
+Seu cadastro, suas clínicas, seus pacientes e suas sessões foram apagados de forma definitiva e não podem ser recuperados.
+
+Lembre-se: a guarda dos prontuários pelo prazo exigido pelo seu conselho profissional continua sendo sua responsabilidade. Guarde em local seguro o arquivo de exportação, se você o baixou.
+
+Se não foi você quem pediu a exclusão, fale com o encarregado de dados pelo canal indicado em {{ site_url }}/privacidade.{% endblock %}

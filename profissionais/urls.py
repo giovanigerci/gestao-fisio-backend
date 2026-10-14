@@ -4,12 +4,16 @@ from profissionais.views_auth import (
     SolicitarResetSenhaView, RedefinirSenhaView,
 )
 from .views import EnviarCodigoCadastroView, RegistroView, PerfilView
+from .views_dados import ExcluirContaView, ExportarDadosView, ResumoDosDadosView
 
 urlpatterns = [
     path('registrar/enviar-codigo/', EnviarCodigoCadastroView.as_view(), name='registrar-enviar-codigo'),
     path('registrar/', RegistroView.as_view(), name='registrar'),
     path('me/', PerfilView.as_view(), name='perfil'),
     path('me/foto/', FotoPerfilView.as_view(), name='perfil-foto'),
+    path('me/dados/', ResumoDosDadosView.as_view(), name='perfil-dados'),
+    path('me/exportar/', ExportarDadosView.as_view(), name='perfil-exportar'),
+    path('excluir-conta/', ExcluirContaView.as_view(), name='excluir-conta'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('trocar-senha/', TrocarSenhaView.as_view(), name='trocar-senha'),
     path('esqueci-senha/', SolicitarResetSenhaView.as_view(), name='esqueci-senha'),

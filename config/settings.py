@@ -148,6 +148,8 @@ REST_FRAMEWORK = {
         'registro': '5/minute',
         'codigo_email': '10/hour',
         'password_reset': '3/hour',
+        'exportar_dados': '10/hour',
+        'excluir_conta': '5/hour',
     },
 }
 

@@ -194,3 +194,12 @@ class RedefinirSenhaSerializer(serializers.Serializer):
 
         validar_senha(data['nova_senha'], self.context.get('user'), 'nova_senha')
         return data
+
+
+class ExcluirContaSerializer(serializers.Serializer):
+    senha = serializers.CharField(write_only=True, max_length=MAX_SENHA)
+
+    def validate_senha(self, value):
+        if not self.context['request'].user.check_password(value):
+            raise serializers.ValidationError('Senha incorreta.')
+        return value

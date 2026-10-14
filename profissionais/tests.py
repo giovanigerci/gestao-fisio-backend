@@ -3,17 +3,26 @@ import re
 import shutil
 import smtplib
 import tempfile
+import zipfile
+from datetime import date, time
+from decimal import Decimal
 from unittest.mock import patch
 from PIL import Image
 from django.contrib.auth.models import User
 from django.core import mail
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
 from rest_framework import status
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 from datetime import timedelta
 from django.utils import timezone
+from agenda.models import Agendamento
+from clinicas.models import Clinica
+from pacientes.models import Paciente
 from profissionais.models import CodigoVerificacaoEmail, Profissional
 from profissionais.serializers import MENSAGEM_SENHA_FRACA
 
@@ -449,3 +458,243 @@ class EmailUnicoNoPerfilAPITestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.user.refresh_from_db()
         self.assertEqual(self.user.email, 'joao@exemplo.com')
+
+
+class BaseDadosDaContaTestCase(TestCase):
+    """Dois profissionais com dados próprios: o que um faz não pode alcançar o outro."""
+
+    SENHA = 'SenhaForte123'
+
+    def setUp(self):
+        cache.clear()  # zera os contadores de throttle entre os testes
+        self.user, self.profissional = self.criar_profissional('dra_ana', 'ana@exemplo.com', 'ANA-F')
+        self.outro_user, self.outro = self.criar_profissional('dr_bruno', 'bruno@exemplo.com', 'BRUNO-F')
+        self.clinica, self.paciente, self.sessao = self.criar_dados(self.profissional, 'Ana')
+        self.criar_dados(self.outro, 'Bruno')
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def criar_profissional(self, username, email, crefito):
+        user = User.objects.create_user(username=username, email=email, password=self.SENHA, first_name=username)
+        profissional = Profissional.objects.create(
+            usuario=user, telefone='11999999999', especialidade='Pilates', crefito=crefito
+        )
+        return user, profissional
+
+    @staticmethod
+    def criar_dados(profissional, sufixo):
+        clinica = Clinica.objects.create(
+            profissional=profissional, nome=f'Clínica {sufixo}', endereco='Rua A, 1', valor_por_atendimento=Decimal('80.00')
+        )
+        paciente = Paciente.objects.create(
+            profissional=profissional, nome=f'Paciente {sufixo}', cpf='123.456.789-00', telefone='11988887777',
+            data_nascimento=date(1990, 5, 20), historico_medico=f'Histórico de {sufixo}',
+        )
+        sessao = Agendamento.objects.create(
+            profissional=profissional, clinica=clinica, paciente=paciente, data=date(2026, 3, 10),
+            hora_inicio=time(8, 0), hora_fim=time(9, 0), status='RE',
+        )
+        return clinica, paciente, sessao
+
+    @staticmethod
+    def registros(profissional_id):
+        return (
+            Clinica.objects.filter(profissional_id=profissional_id).count(),
+            Paciente.objects.filter(profissional_id=profissional_id).count(),
+            Agendamento.objects.filter(profissional_id=profissional_id).count(),
+        )
+
+
+class ExportacaoDeDadosAPITestCase(BaseDadosDaContaTestCase):
+    URL = '/api/auth/me/exportar/'
+
+    def pacote(self):
+        return zipfile.ZipFile(io.BytesIO(self.client.get(self.URL).content))
+
+    def arquivos(self):
+        pacote = self.pacote()
+        return {nome: pacote.read(nome).decode('utf-8-sig') for nome in pacote.namelist()}
+
+    def test_devolve_um_zip_com_todas_as_planilhas(self):
+        response = self.client.get(self.URL)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response['Content-Type'], 'application/zip')
+        self.assertIn('attachment; filename="gestao-fisio-dados-', response['Content-Disposition'])
+        self.assertEqual(response['Cache-Control'], 'no-store')
+        self.assertEqual(
+            sorted(zipfile.ZipFile(io.BytesIO(response.content)).namelist()),
+            ['LEIAME.txt', 'agendamentos.csv', 'clinicas.csv', 'pacientes.csv', 'perfil.csv'],
+        )
+
+    def test_planilhas_trazem_os_dados_em_formato_que_o_excel_abre(self):
+        arquivos = self.arquivos()
+
+        self.assertIn('Nome;CPF;Telefone;E-mail;Data de nascimento;Endereço;Histórico médico', arquivos['pacientes.csv'])
+        self.assertIn('Paciente Ana;123.456.789-00;11988887777;;20/05/1990;;Histórico de Ana', arquivos['pacientes.csv'])
+        self.assertIn('Clínica Ana;Rua A, 1;;80,00;Sim', arquivos['clinicas.csv'])
+        self.assertIn(
+            '10/03/2026;08:00;09:00;Paciente Ana;123.456.789-00;Clínica Ana;Realizado;Não;80,00',
+            arquivos['agendamentos.csv'],
+        )
+        self.assertIn('ana@exemplo.com', arquivos['perfil.csv'])
+
+    def test_arquivo_comeca_com_bom_para_o_excel_reconhecer_os_acentos(self):
+        self.assertTrue(self.pacote().read('pacientes.csv').startswith(b'\xef\xbb\xbf'))
+
+    def test_exporta_so_os_dados_do_proprio_profissional(self):
+        tudo = '\n'.join(self.arquivos().values())
+
+        self.assertIn('Paciente Ana', tudo)
+        self.assertNotIn('Bruno', tudo)
+        self.assertNotIn('bruno@exemplo.com', tudo)
+
+    def test_texto_que_parece_formula_e_neutralizado(self):
+        self.paciente.nome = '+55 Nome'
+        self.paciente.historico_medico = '=HYPERLINK("http://malicioso";"clique")'
+        self.paciente.save()
+
+        planilha = self.arquivos()['pacientes.csv']
+
+        self.assertIn("'+55 Nome", planilha)
+        self.assertIn("'=HYPERLINK", planilha)
+
+    def test_numero_de_consultas_nao_cresce_com_o_volume_de_dados(self):
+        def consultas():
+            with CaptureQueriesContext(connection) as contexto:
+                self.client.get(self.URL)
+            return len(contexto)
+
+        antes = consultas()
+        for i in range(5):
+            paciente = Paciente.objects.create(profissional=self.profissional, nome=f'Extra {i}', cpf=str(i), telefone='1')
+            Agendamento.objects.create(
+                profissional=self.profissional, clinica=self.clinica, paciente=paciente, data=date(2026, 4, 1 + i),
+                hora_inicio=time(8, 0), hora_fim=time(9, 0),
+            )
+
+        self.assertEqual(consultas(), antes)
+
+    def test_resumo_conta_so_os_registros_proprios(self):
+        response = self.client.get('/api/auth/me/dados/')
+
+        self.assertEqual(response.data, {'clinicas': 1, 'pacientes': 1, 'agendamentos': 1})
+
+    def test_exige_login(self):
+        anonimo = APIClient()
+
+        self.assertEqual(anonimo.get(self.URL).status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(anonimo.get('/api/auth/me/dados/').status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+# Força o disco local mesmo com USE_S3=True no .env, para os testes nunca tocarem no bucket real
+@override_settings(
+    MEDIA_ROOT=MEDIA_ROOT_TESTE,
+    STORAGES={
+        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+    },
+)
+class ExclusaoDeContaAPITestCase(BaseDadosDaContaTestCase):
+    URL = '/api/auth/excluir-conta/'
+
+    def excluir(self, senha=None, client=None):
+        return (client or self.client).post(self.URL, {'senha': senha or self.SENHA})
+
+    def test_senha_errada_nao_apaga_nada(self):
+        response = self.excluir('senha-errada')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['senha'], ['Senha incorreta.'])
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+        self.assertEqual(self.registros(self.profissional.id), (1, 1, 1))
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_sem_senha_nao_apaga_nada(self):
+        response = self.client.post(self.URL, {})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+
+    def test_apaga_a_conta_e_tudo_o_que_e_dela(self):
+        profissional_id = self.profissional.id
+
+        response = self.excluir()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(User.objects.filter(pk=self.user.pk).exists())
+        self.assertFalse(Profissional.objects.filter(pk=profissional_id).exists())
+        self.assertEqual(self.registros(profissional_id), (0, 0, 0))
+
+    def test_nao_toca_nos_dados_de_outro_profissional(self):
+        self.excluir()
+
+        self.assertTrue(User.objects.filter(pk=self.outro_user.pk).exists())
+        self.assertEqual(self.registros(self.outro.id), (1, 1, 1))
+
+    def test_apaga_a_foto_do_armazenamento(self):
+        self.profissional.foto = gerar_imagem()
+        self.profissional.save()
+        caminho, armazenamento = self.profissional.foto.name, self.profissional.foto.storage
+        self.assertTrue(armazenamento.exists(caminho))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.excluir()
+
+        self.assertFalse(armazenamento.exists(caminho))
+
+    def test_limpa_os_cookies_de_sessao(self):
+        response = self.excluir()
+
+        self.assertEqual(response.cookies['access_token'].value, '')
+        self.assertEqual(response.cookies['refresh_token'].value, '')
+
+    def test_sessao_antiga_deixa_de_funcionar(self):
+        navegador = APIClient()
+        login = navegador.post('/api/auth/token/', {'username': 'dra_ana', 'password': self.SENHA})
+        self.assertEqual(login.status_code, status.HTTP_200_OK)
+        refresh_antigo = login.cookies['refresh_token'].value
+        self.assertTrue(OutstandingToken.objects.filter(user=self.user).exists())
+
+        self.assertEqual(self.excluir(client=navegador).status_code, status.HTTP_200_OK)
+
+        self.assertFalse(OutstandingToken.objects.filter(user_id=self.user.pk).exists())
+        outro_navegador = APIClient()
+        outro_navegador.cookies['refresh_token'] = refresh_antigo
+        self.assertEqual(outro_navegador.post('/api/auth/token/refresh/').status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_avisa_por_email(self):
+        self.excluir()
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['ana@exemplo.com'])
+        self.assertIn('excluída', mail.outbox[0].subject)
+        self.assertIn('definitiva', mail.outbox[0].body)
+
+    def test_conta_sem_email_e_excluida_sem_aviso(self):
+        User.objects.filter(pk=self.user.pk).update(email='')
+        self.user.refresh_from_db()
+        self.client.force_authenticate(user=self.user)
+
+        self.assertEqual(self.excluir().status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_falha_no_email_nao_impede_a_exclusao(self):
+        with patch('profissionais.views_dados.send_mail', side_effect=smtplib.SMTPException('fora do ar')), \
+                self.assertLogs('profissionais.views_dados', level='ERROR'):
+            response = self.excluir()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(User.objects.filter(pk=self.user.pk).exists())
+
+    def test_limita_tentativas_de_senha(self):
+        for _ in range(5):
+            self.assertEqual(self.excluir('errada').status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.assertEqual(self.excluir('errada').status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertTrue(User.objects.filter(pk=self.user.pk).exists())
+
+    def test_exige_login(self):
+        resposta = APIClient().post(self.URL, {'senha': self.SENHA})
+
+        self.assertEqual(resposta.status_code, status.HTTP_401_UNAUTHORIZED)
