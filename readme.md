@@ -139,6 +139,11 @@ que lê o `access_token` diretamente do cookie da requisição.
 | POST        | `/api/auth/trocar-senha/`        | Troca de senha (requer senha atual)             |
 | POST        | `/api/auth/esqueci-senha/`       | Solicita e-mail de recuperação de senha         |
 | POST        | `/api/auth/redefinir-senha/`     | Redefine a senha via token do e-mail            |
+| GET         | `/api/auth/me/dados/`            | Quantos registros a conta tem (clínicas, pacientes, sessões) |
+| GET         | `/api/auth/me/exportar/`         | Exportação integral dos dados (LGPD): ZIP com planilhas CSV |
+| POST        | `/api/auth/excluir-conta/`       | Exclui a conta e todos os dados, de forma definitiva (requer a senha) |
+
+**Exclusão de conta (LGPD):** confirmada pela senha e com limite de tentativas. Apaga, numa transação, o usuário e em cascata o perfil, as clínicas, os pacientes e as sessões; além disso a foto no armazenamento (depois do commit), os tokens de sessão e os cookies, e avisa por e-mail. A exportação é oferecida antes, na mesma tela: a guarda do prontuário pelo prazo legal é do profissional. As planilhas neutralizam texto que começaria como fórmula (*CSV injection*).
 
 ### Clínicas (`/api/clinicas/`)
 
