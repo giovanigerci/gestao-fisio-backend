@@ -2,6 +2,10 @@
 
 Este diretório reúne o pacote oficial de documentação jurídica e de conformidade com a **Lei Geral de Proteção de Dados (Lei nº 13.709/2018 - LGPD)**, **Marco Civil da Internet (Lei nº 12.965/2014)**, **Código de Defesa do Consumidor (Lei nº 8.078/1990)** e normativas do **Conselho Federal de Fisioterapia e Terapia Ocupacional (COFFITO - Resoluções nº 414/2012 e nº 424/2013)**.
 
+> **Versão vigente:** os Termos de Uso e a Política de Privacidade que valem para os usuários são os publicados no site ([gestao-fisio.com/termos](https://gestao-fisio.com/termos) e [gestao-fisio.com/privacidade](https://gestao-fisio.com/privacidade)), mantidos no repositório do frontend. Os arquivos `01`, `02` e `05` deste diretório são os rascunhos de origem (setembro de 2026) e não acompanham as atualizações seguintes, como a exclusão de conta pelo próprio usuário e o tratamento dos registros técnicos de acesso. Em caso de divergência, vale o texto do site.
+>
+> Contatos: `privacidade@gestao-fisio.com` (encarregado de dados) e `contato@gestao-fisio.com` (suporte).
+
 ---
 
 ## 📋 Sumário dos Documentos
@@ -26,4 +30,4 @@ Este diretório reúne o pacote oficial de documentação jurídica e de conform
 3. **Risco de Denúncia Ético-Profissional (CREFITO / COFFITO)**:
    - *Mitigação*: Cláusula expressa de inviolabilidade do sigilo profissional, garantia de guarda do histórico médico pelo tempo regulamentar e proibição absoluta de mercantilização de dados clínicos de pacientes.
 4. **Risco de Sanções por Falta de Segurança (Art. 46 da LGPD e Marco Civil)**:
-   - *Mitigação*: Plano de segurança documentado, criptografia de credenciais, logs de acesso ao sistema (Art. 15 da Lei 12.965/2014) e isolamento multi-tenant por ORM.
+   - *Mitigação*: Plano de segurança documentado, criptografia de credenciais, limite de tentativas nas rotas de autenticação e isolamento multi-tenant por ORM.

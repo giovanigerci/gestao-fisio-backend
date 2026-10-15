@@ -31,7 +31,7 @@ Em consonância com as boas práticas de segurança defensiva (*Security by Desi
 - **Transporte Seguro (TLS/HTTPS)**: Tráfego cifrado em repouso e em trânsito com certificados TLS modernos, mitigando interceptações do tipo *Man-in-the-Middle*.
 
 ### 2.3. Rastreabilidade e Auditoria
-- **Logs de Acesso a Aplicação**: Registros obrigatórios de conexão conforme Art. 15 do Marco Civil da Internet (data, hora, IP de origem e rota acessada), mantidos em ambiente seguro por no mínimo 6 meses.
+- **Logs de Acesso a Aplicação**: Registros técnicos das requisições (data, hora, IP de origem e rota acessada) mantidos pelos provedores de hospedagem, pelo período curto definido por eles, e usados na investigação de incidentes.
 
 ---
 
