@@ -74,4 +74,4 @@ O Usuário pode, a qualquer tempo, consultar, restringir ou bloquear os cookies 
 
 Em caso de dúvidas sobre as práticas de cookies e armazenamento técnico da Plataforma, entre em contato com nosso Encarregado pelo Tratamento de Dados Pessoais:
 
-- **E-mail**: `dpo@gestaofisio.com.br`
+- **E-mail**: `privacidade@gestao-fisio.com`

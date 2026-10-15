@@ -129,7 +129,7 @@ Nos termos do Artigo 18 da LGPD, o Titular de dados pessoais possui os seguintes
 Para esclarecer quaisquer dúvidas sobre esta Política, solicitar o exercício de direitos ou relatar qualquer inconformidade com a LGPD, o titular poderá entrar em contato com o Encarregado de Proteção de Dados:
 
 - **Encarregado pelo Tratamento de Dados Pessoais (DPO)**: Setor de Privacidade e Proteção de Dados Gestão Fisio  
-- **E-mail de Contato**: `dpo@gestaofisio.com.br`  
+- **E-mail de Contato**: `privacidade@gestao-fisio.com`  
 - **Prazo de Atendimento**: As solicitações de titulares serão respondidas no prazo legal de até 15 (quinze) dias úteis, na forma da regulamentação da ANPD.
 
 ---

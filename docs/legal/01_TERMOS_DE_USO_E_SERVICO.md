@@ -118,5 +118,5 @@ Ao criar uma conta, clicar em "Aceito os Termos de Uso e a Política de Privacid
 ---
 
 **Canais de Atendimento e Suporte:**  
-E-mail de Contato: `contato@gestaofisio.com.br`  
-Encarregado de Dados (DPO): `dpo@gestaofisio.com.br`
+E-mail de Contato: `contato@gestao-fisio.com`  
+Encarregado de Dados (DPO): `privacidade@gestao-fisio.com`
