@@ -106,16 +106,21 @@ O sistema usa **JWT via `djangorestframework-simplejwt`**, mas os tokens são en
 JavaScript do navegador e mitiga ataques XSS.
 
 O backend define uma classe customizada `CookieJWTAuthentication` (em `profissionais/authentication.py`)
-que lê o `access_token` diretamente do cookie da requisição.
+que lê o token do cookie `access` da requisição. Nomes, caminhos e durações dos cookies ficam em
+`profissionais/cookies.py`.
 
 **Clientes que consomem a API devem:**
 - Enviar requisições com credenciais: `credentials: "include"` (fetch) ou `withCredentials: true` (Angular `HttpClient`).
 - **Não** enviar o header `Authorization: Bearer <token>` — ele é ignorado.
 
-**Ciclo de vida dos tokens:**
-- `access_token` expira em **5 minutos**.
-- `refresh_token` expira em **1 dia** e é rotacionado a cada uso (`ROTATE_REFRESH_TOKENS = True`).
-- O logout invalida o refresh token (blacklist via `rest_framework_simplejwt.token_blacklist`).
+**Cookies e ciclo de vida dos tokens:**
+- `access` (caminho `/api/`) expira em **5 minutos**.
+- `refresh` (caminho `/api/auth/`, para chegar também ao logout) expira em **1 dia** (30 dias com "manter conectado") e é rotacionado a cada uso: o anterior vai para a blacklist (`rest_framework_simplejwt.token_blacklist`).
+- Os dois valem só para o host da API (sem `Domain`), são `HttpOnly`, `SameSite=Lax` e `Secure` em produção.
+- O logout invalida o refresh token. Trocar a senha derruba as outras sessões (a atual recebe tokens novos); redefinir a senha derruba todas.
+- Até 2026-11-16 os cookies antigos (`access_token`/`refresh_token`, com `COOKIE_DOMAIN`) continuam aceitos e são apagados a cada resposta que mexe na sessão. Depois disso, remova `COOKIES_ANTIGOS` e a variável `COOKIE_DOMAIN`.
+
+**Limites de tentativas:** login (5/min por IP e 10/h por conta), cadastro, código por e-mail, recuperação e redefinição de senha, troca de senha, exportação e exclusão de conta. Os contadores ficam no cache em banco (tabela `cache_compartilhado`, criada por migration), compartilhado entre os processos do gunicorn. Atrás de proxy, `NUM_PROXIES` diz quantos acrescentam o `X-Forwarded-For`: sem ele, quem forja o cabeçalho escapa do limite por IP.
 
 ## Endpoints completos
 
@@ -131,14 +136,14 @@ que lê o `access_token` diretamente do cookie da requisição.
 |-------------|----------------------------------|-------------------------------------------------|
 | POST        | `/api/auth/registrar/enviar-codigo/` | 1ª etapa do cadastro: valida os dados e envia um código de 6 dígitos ao e-mail (não cria a conta; reenvio a cada 60s) |
 | POST        | `/api/auth/registrar/`           | 2ª etapa: com o `codigo` recebido por e-mail, cria `User` + `Profissional` numa transação (código vale 10 min, 5 tentativas) |
-| POST        | `/api/auth/token/`               | Login — define cookies `access_token` + `refresh_token` |
-| POST        | `/api/auth/token/refresh/`       | Renova o `access_token` via `refresh_token` no cookie |
-| POST        | `/api/auth/logout/`              | Invalida o `refresh_token` e limpa os cookies   |
+| POST        | `/api/auth/token/`               | Login — define os cookies `access` + `refresh` |
+| POST        | `/api/auth/token/refresh/`       | Renova os dois cookies a partir do `refresh` (o anterior é invalidado) |
+| POST        | `/api/auth/logout/`              | Invalida o `refresh` e limpa os cookies         |
 | GET / PATCH | `/api/auth/me/`                  | Perfil do profissional autenticado              |
 | POST / DELETE | `/api/auth/me/foto/`           | Upload (JPEG, PNG ou WEBP, até 5 MB) ou remoção da foto de perfil |
-| POST        | `/api/auth/trocar-senha/`        | Troca de senha (requer senha atual)             |
+| POST        | `/api/auth/trocar-senha/`        | Troca de senha (requer senha atual); derruba as outras sessões |
 | POST        | `/api/auth/esqueci-senha/`       | Solicita e-mail de recuperação de senha         |
-| POST        | `/api/auth/redefinir-senha/`     | Redefine a senha via token do e-mail            |
+| POST        | `/api/auth/redefinir-senha/`     | Redefine a senha via token do e-mail; derruba todas as sessões |
 | GET         | `/api/auth/me/dados/`            | Quantos registros a conta tem (clínicas, pacientes, sessões) |
 | GET         | `/api/auth/me/exportar/`         | Exportação integral dos dados (LGPD): ZIP com planilhas CSV |
 | POST        | `/api/auth/excluir-conta/`       | Exclui a conta e todos os dados, de forma definitiva (requer a senha) |
@@ -183,7 +188,7 @@ A listagem traz, além dos dados da clínica, `cor` (1 a 5, escolhida pelo siste
 
 Todos aceitam `data=AAAA-MM-DD` (padrão: hoje, no fuso `America/Sao_Paulo`); parâmetros inválidos respondem 400.
 
-Todas as rotas de domínio e financeiro exigem autenticação — o `access_token` deve estar presente
+Todas as rotas de domínio e financeiro exigem autenticação — o cookie `access` deve estar presente
 no cookie da requisição (enviado automaticamente pelo navegador quando `credentials: include`).
 
 ## Rodando o projeto localmente
@@ -244,7 +249,8 @@ Todas as variáveis estão documentadas em `.env.example`. As principais:
 | `DATABASE_URL`        | ✅ (produção) | URL completa do banco — substitui as vars `POSTGRES_*` se definida |
 | `CORS_ALLOWED_ORIGINS`| —           | Origens permitidas para CORS (padrão: `http://localhost:4200`) |
 | `COOKIE_SECURE`       | —           | `True` em produção com HTTPS, `False` em dev         |
-| `COOKIE_DOMAIN`       | —           | Domínio dos cookies JWT (necessário em produção)     |
+| `COOKIE_DOMAIN`       | —           | Domínio dos cookies antigos, só para apagá-los até 2026-11-16 (os novos valem apenas para o host da API) |
+| `NUM_PROXIES`         | ✅ (produção) | Quantos proxies acrescentam o `X-Forwarded-For` na frente da API (identifica o IP real nos limites de tentativas) |
 | `FRONTEND_URL`        | —           | URL do frontend para links de e-mail (padrão: `http://localhost:4200`) |
 | `EMAIL_BACKEND`       | ✅ (produção) | Backend de e-mail (padrão: `console` — imprime no terminal, não envia nada). Em produção: `django.core.mail.backends.smtp.EmailBackend` |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | ✅ (produção) | SMTP do Resend: `smtp.resend.com`, `587`, usuário `resend`, senha = API key |
