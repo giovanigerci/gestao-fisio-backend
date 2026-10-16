@@ -16,7 +16,7 @@ from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 from .exportacao import contar_dados, exportar_dados
 from .models import CodigoVerificacaoEmail
 from .serializers import ExcluirContaSerializer
-from .views_auth import remover_cookies_de_sessao
+from .cookies import remover_cookies_de_sessao
 
 logger = logging.getLogger(__name__)
 

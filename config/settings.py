@@ -145,11 +145,22 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
     'DEFAULT_THROTTLE_RATES': {
         'login': '5/minute',
+        'login_conta': '10/hour',
         'registro': '5/minute',
         'codigo_email': '10/hour',
         'password_reset': '3/hour',
+        'redefinir_senha': '10/hour',
+        'trocar_senha': '10/hour',
         'exportar_dados': '10/hour',
         'excluir_conta': '5/hour',
+    },
+    'NUM_PROXIES': config('NUM_PROXIES', default=None, cast=lambda v: int(v) if v not in (None, '') else None),
+}
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'cache_compartilhado',
     },
 }
 

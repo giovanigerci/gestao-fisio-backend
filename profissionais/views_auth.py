@@ -11,6 +11,7 @@ from django.template.loader import render_to_string
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import AuthenticationFailed
@@ -18,65 +19,58 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.throttling import ScopedRateThrottle
 
+from .cookies import (
+    DURACAO_REFRESH, DURACAO_REFRESH_LONGA, definir_cookies_de_sessao, ler_refresh, remover_cookies_de_sessao,
+)
 from .serializers import TrocarSenhaSerializer, RedefinirSenhaSerializer, FotoPerfilSerializer
+from .throttling import LoginPorContaThrottle
 
 logger = logging.getLogger(__name__)
 
 
+def novo_refresh(usuario, sessao_longa):
+    refresh = RefreshToken.for_user(usuario)
+    if sessao_longa:
+        refresh.set_exp(lifetime=datetime.timedelta(seconds=DURACAO_REFRESH_LONGA))
+    return refresh
+
+
+def e_sessao_longa(refresh):
+    expira_em = datetime.datetime.fromtimestamp(refresh['exp'], tz=datetime.timezone.utc)
+    return expira_em - timezone.now() > datetime.timedelta(seconds=DURACAO_REFRESH)
+
+
+def revogar_sessoes(usuario):
+    pendentes = OutstandingToken.objects.filter(user=usuario, blacklistedtoken__isnull=True)
+    BlacklistedToken.objects.bulk_create([BlacklistedToken(token=token) for token in pendentes], ignore_conflicts=True)
+
+
 class LoginCookieView(TokenObtainPairView):
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ScopedRateThrottle, LoginPorContaThrottle]
     throttle_scope = 'login'
 
     def post(self, request, *args, **kwargs):
+        logger.warning(
+            'Diagnóstico de IP (temporário): X-Forwarded-For=%r REMOTE_ADDR=%r CF-Connecting-IP=%r True-Client-IP=%r',
+            request.META.get('HTTP_X_FORWARDED_FOR'), request.META.get('REMOTE_ADDR'),
+            request.META.get('HTTP_CF_CONNECTING_IP'), request.META.get('HTTP_TRUE_CLIENT_IP'),
+        )
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = serializer.user
-        manter_conectado = request.data.get('manter_conectado', False)
-
-        refresh = RefreshToken.for_user(user)
-        if manter_conectado:
-            refresh.set_exp(lifetime=datetime.timedelta(days=30))
-        
-        access = refresh.access_token
-
-        response = Response({'detail': 'Login realizado com sucesso.'})
-
-        response.set_cookie(
-            key='access_token',
-            value=str(access),
-            httponly=True,
-            secure=settings.COOKIE_SECURE,
-            samesite=settings.COOKIE_SAMESITE,
-            domain=settings.COOKIE_DOMAIN,
-            max_age=5 * 60,
-            path='/api/',
-        )
-
-        max_age_refresh = 30 * 24 * 60 * 60 if manter_conectado else 24 * 60 * 60
-        response.set_cookie(
-            key='refresh_token',
-            value=str(refresh),
-            httponly=True,
-            secure=settings.COOKIE_SECURE,
-            samesite=settings.COOKIE_SAMESITE,
-            domain=settings.COOKIE_DOMAIN,
-            max_age=max_age_refresh,
-            path='/api/auth/token/refresh/',
-        )
-
-        return response
+        manter_conectado = bool(request.data.get('manter_conectado', False))
+        refresh = novo_refresh(serializer.user, manter_conectado)
+        return definir_cookies_de_sessao(Response({'detail': 'Login realizado com sucesso.'}), refresh, manter_conectado)
 
 
 class RefreshCookieView(TokenRefreshView):
     def post(self, request, *args, **kwargs):
-        refresh_token = request.COOKIES.get('refresh_token')
-
-        if not refresh_token:
+        valor = ler_refresh(request)
+        if not valor:
             raise AuthenticationFailed('Refresh token não encontrado.')
 
         try:
-            token_antigo = RefreshToken(refresh_token)
+            token_antigo = RefreshToken(valor)
         except (InvalidToken, TokenError):
             raise AuthenticationFailed('Token inválido ou expirado.')
 
@@ -85,49 +79,23 @@ class RefreshCookieView(TokenRefreshView):
         except User.DoesNotExist:
             raise AuthenticationFailed('Usuário não encontrado.')
 
-        expira_em = datetime.datetime.fromtimestamp(token_antigo['exp'], tz=datetime.timezone.utc)
-        tempo_restante = expira_em - timezone.now()
-        sessao_longa = tempo_restante > datetime.timedelta(hours=24)
-
-        novo_refresh = RefreshToken.for_user(user)
-        if sessao_longa:
-            novo_refresh.set_exp(lifetime=datetime.timedelta(days=30))
-            max_age_refresh = 30 * 24 * 60 * 60
-        else:
-            max_age_refresh = 24 * 60 * 60
-
-        access = novo_refresh.access_token
-
-        try:
-            token_antigo.blacklist()
-        except AttributeError:
-            pass
-
-        response = Response({'detail': 'Token renovado com sucesso.'})
-        response.set_cookie(
-            key='access_token', value=str(access), httponly=True, secure=settings.COOKIE_SECURE,
-            samesite=settings.COOKIE_SAMESITE, domain=settings.COOKIE_DOMAIN, max_age=5 * 60, path='/api/',
+        sessao_longa = e_sessao_longa(token_antigo)
+        token_antigo.blacklist()
+        return definir_cookies_de_sessao(
+            Response({'detail': 'Token renovado com sucesso.'}), novo_refresh(user, sessao_longa), sessao_longa,
         )
-        response.set_cookie(
-            key='refresh_token', value=str(novo_refresh), httponly=True, secure=settings.COOKIE_SECURE,
-            samesite=settings.COOKIE_SAMESITE, domain=settings.COOKIE_DOMAIN, max_age=max_age_refresh, path='/api/auth/token/refresh/',
-        )
-
-        return response
-
-def remover_cookies_de_sessao(response):
-    """Apaga os cookies de access e refresh (logout e exclusão de conta)."""
-    response.delete_cookie('access_token', path='/api/', domain=settings.COOKIE_DOMAIN, samesite=settings.COOKIE_SAMESITE)
-    response.cookies['access_token']['secure'] = settings.COOKIE_SECURE
-    response.delete_cookie('refresh_token', path='/api/auth/token/refresh/', domain=settings.COOKIE_DOMAIN, samesite=settings.COOKIE_SAMESITE)
-    response.cookies['refresh_token']['secure'] = settings.COOKIE_SECURE
-    return response
 
 
 class LogoutView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        valor = ler_refresh(request)
+        if valor:
+            try:
+                RefreshToken(valor).blacklist()
+            except (InvalidToken, TokenError):
+                pass
         return remover_cookies_de_sessao(Response({'detail': 'Logout realizado com sucesso.'}))
 
 class FotoPerfilView(APIView):
@@ -161,6 +129,8 @@ class FotoPerfilView(APIView):
 
 class TrocarSenhaView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'trocar_senha'
 
     def post(self, request):
         serializer = TrocarSenhaSerializer(data=request.data, context={'request': request})
@@ -170,7 +140,21 @@ class TrocarSenhaView(APIView):
         user.set_password(serializer.validated_data['nova_senha'])
         user.save()
 
-        return Response({'detail': 'Senha alterada com sucesso.'})
+        sessao_longa = self._sessao_atual_e_longa(request)
+        revogar_sessoes(user)
+        return definir_cookies_de_sessao(
+            Response({'detail': 'Senha alterada com sucesso.'}), novo_refresh(user, sessao_longa), sessao_longa,
+        )
+
+    @staticmethod
+    def _sessao_atual_e_longa(request):
+        valor = ler_refresh(request)
+        if not valor:
+            return False
+        try:
+            return e_sessao_longa(RefreshToken(valor))
+        except (InvalidToken, TokenError):
+            return False
 
 
 class SolicitarResetSenhaView(APIView):
@@ -217,6 +201,8 @@ class SolicitarResetSenhaView(APIView):
 
 class RedefinirSenhaView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'redefinir_senha'
 
     def post(self, request):
         uid = request.data.get('uid', '')
@@ -246,8 +232,8 @@ class RedefinirSenhaView(APIView):
         )
         serializer.is_valid(raise_exception=True)
 
-        # Atualiza a senha (isso invalida o token automaticamente)
         user.set_password(serializer.validated_data['nova_senha'])
         user.save()
+        revogar_sessoes(user)
 
         return Response({'detail': 'Senha redefinida com sucesso.'})

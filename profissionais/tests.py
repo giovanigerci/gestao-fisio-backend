@@ -646,21 +646,21 @@ class ExclusaoDeContaAPITestCase(BaseDadosDaContaTestCase):
     def test_limpa_os_cookies_de_sessao(self):
         response = self.excluir()
 
-        self.assertEqual(response.cookies['access_token'].value, '')
-        self.assertEqual(response.cookies['refresh_token'].value, '')
+        self.assertEqual(response.cookies['access'].value, '')
+        self.assertEqual(response.cookies['refresh'].value, '')
 
     def test_sessao_antiga_deixa_de_funcionar(self):
         navegador = APIClient()
         login = navegador.post('/api/auth/token/', {'username': 'dra_ana', 'password': self.SENHA})
         self.assertEqual(login.status_code, status.HTTP_200_OK)
-        refresh_antigo = login.cookies['refresh_token'].value
+        refresh_antigo = login.cookies['refresh'].value
         self.assertTrue(OutstandingToken.objects.filter(user=self.user).exists())
 
         self.assertEqual(self.excluir(client=navegador).status_code, status.HTTP_200_OK)
 
         self.assertFalse(OutstandingToken.objects.filter(user_id=self.user.pk).exists())
         outro_navegador = APIClient()
-        outro_navegador.cookies['refresh_token'] = refresh_antigo
+        outro_navegador.cookies['refresh'] = refresh_antigo
         self.assertEqual(outro_navegador.post('/api/auth/token/refresh/').status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_avisa_por_email(self):

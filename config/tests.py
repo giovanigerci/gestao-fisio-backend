@@ -19,7 +19,7 @@ class HealthCheckAPITestCase(TestCase):
             self.client.get(self.url)
 
     def test_ignora_cookie_de_token_invalido(self):
-        self.client.cookies['access_token'] = 'token-invalido'
+        self.client.cookies['access'] = 'token-invalido'
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
