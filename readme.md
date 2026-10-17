@@ -120,6 +120,8 @@ que lê o token do cookie `access` da requisição. Nomes, caminhos e durações
 - O logout invalida o refresh token. Trocar a senha derruba as outras sessões (a atual recebe tokens novos); redefinir a senha derruba todas.
 - Até 2026-11-16 os cookies antigos (`access_token`/`refresh_token`, com `COOKIE_DOMAIN`) continuam aceitos e são apagados a cada resposta que mexe na sessão. Depois disso, remova `COOKIES_ANTIGOS` e a variável `COOKIE_DOMAIN`.
 
+**Origem:** requisições que alteram dados (POST, PUT, PATCH, DELETE) com `Origin` diferente do front (`CORS_ALLOWED_ORIGINS`) ou do próprio host da API recebem 403 (`config/middleware.py`). O `SameSite=Lax` sozinho não separa subdomínios.
+
 **Limites de tentativas:** login (5/min por IP e 10/h por conta), cadastro, código por e-mail, recuperação e redefinição de senha, troca de senha, exportação e exclusão de conta. Os contadores ficam no cache em banco (tabela `cache_compartilhado`, criada por migration), compartilhado entre os processos do gunicorn. Atrás de proxy, `NUM_PROXIES` diz quantos acrescentam o `X-Forwarded-For`: sem ele, quem forja o cabeçalho escapa do limite por IP.
 
 ## Endpoints completos
@@ -139,8 +141,10 @@ que lê o token do cookie `access` da requisição. Nomes, caminhos e durações
 | POST        | `/api/auth/token/`               | Login — define os cookies `access` + `refresh` |
 | POST        | `/api/auth/token/refresh/`       | Renova os dois cookies a partir do `refresh` (o anterior é invalidado) |
 | POST        | `/api/auth/logout/`              | Invalida o `refresh` e limpa os cookies         |
-| GET / PATCH | `/api/auth/me/`                  | Perfil do profissional autenticado              |
-| POST / DELETE | `/api/auth/me/foto/`           | Upload (JPEG, PNG ou WEBP, até 5 MB) ou remoção da foto de perfil |
+| GET / PATCH | `/api/auth/me/`                  | Perfil do profissional autenticado (o e-mail não muda por aqui) |
+| POST        | `/api/auth/me/email/`            | Troca de e-mail, 1º passo: com a senha atual, envia um código ao novo endereço (reenvio a cada 60s) |
+| POST        | `/api/auth/me/email/confirmar/`  | 2º passo: com o código, troca o e-mail e avisa o endereço antigo |
+| POST / DELETE | `/api/auth/me/foto/`           | Upload (JPEG, PNG ou WEBP, até 5 MB) ou remoção da foto de perfil; a foto é recriada em WEBP de até 256 px, sem metadados (EXIF) |
 | POST        | `/api/auth/trocar-senha/`        | Troca de senha (requer senha atual); derruba as outras sessões |
 | POST        | `/api/auth/esqueci-senha/`       | Solicita e-mail de recuperação de senha         |
 | POST        | `/api/auth/redefinir-senha/`     | Redefine a senha via token do e-mail; derruba todas as sessões |
@@ -164,7 +168,7 @@ A listagem traz, além dos dados da clínica, `cor` (1 a 5, escolhida pelo siste
 
 | Método          | Rota                        | Descrição                                    |
 |-----------------|-----------------------------|----------------------------------------------|
-| GET / POST      | `/api/pacientes/`           | Lista ou cria pacientes do profissional      |
+| GET / POST      | `/api/pacientes/`           | Lista ou cria pacientes do profissional (a listagem traz só nome, telefone e status; histórico, endereço e documentos ficam no detalhe) |
 | GET/PUT/PATCH/DELETE | `/api/pacientes/{id}/` | Detalhe, atualização e remoção               |
 
 ### Agenda (`/api/agendamentos/`)
@@ -251,6 +255,7 @@ Todas as variáveis estão documentadas em `.env.example`. As principais:
 | `COOKIE_SECURE`       | —           | `True` em produção com HTTPS, `False` em dev         |
 | `COOKIE_DOMAIN`       | —           | Domínio dos cookies antigos, só para apagá-los até 2026-11-16 (os novos valem apenas para o host da API) |
 | `NUM_PROXIES`         | ✅ (produção) | Quantos proxies acrescentam o `X-Forwarded-For` na frente da API (identifica o IP real nos limites de tentativas) |
+| `ADMIN_ATIVO`         | —           | `False` desliga o Django Admin (`/admin/`); recomendado em produção se ele não for usado (padrão: `True`) |
 | `FRONTEND_URL`        | —           | URL do frontend para links de e-mail (padrão: `http://localhost:4200`) |
 | `EMAIL_BACKEND`       | ✅ (produção) | Backend de e-mail (padrão: `console` — imprime no terminal, não envia nada). Em produção: `django.core.mail.backends.smtp.EmailBackend` |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | ✅ (produção) | SMTP do Resend: `smtp.resend.com`, `587`, usuário `resend`, senha = API key |
