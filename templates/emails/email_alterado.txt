@@ -1,0 +1,8 @@
+{% extends "emails/base.txt" %}
+{% block conteudo %}O e-mail da sua conta foi alterado
+
+O e-mail de acesso da sua conta no Gestão Fisio agora é {{ email_novo }}. Os avisos e a recuperação de senha passam a ir para esse endereço.
+
+Se foi você, não precisa fazer nada.
+
+Se não foi você, escreva agora para contato@gestao-fisio.com.{% endblock %}

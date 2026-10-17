@@ -32,3 +32,27 @@ class LimitesDeTextoPacienteAPITestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('endereco', response.data)
+
+
+class ListagemSemDadosSensiveisAPITestCase(TestCase):
+    def setUp(self):
+        user = User.objects.create_user(username='dr_silva', password='password123')
+        Profissional.objects.create(usuario=user, telefone='11999999999', especialidade='Pilates', crefito='12345-F')
+        self.client = APIClient()
+        self.client.force_authenticate(user=user)
+        self.id = self.client.post('/api/pacientes/', {
+            'nome': 'Maria Souza', 'cpf': '111.111.111-11', 'telefone': '11911111111',
+            'endereco': 'Rua A, 10', 'historico_medico': 'Hérnia de disco L5-S1',
+        }).data['id']
+
+    def test_listagem_traz_so_o_que_a_tela_mostra(self):
+        item = self.client.get('/api/pacientes/').data['results'][0]
+
+        self.assertEqual(set(item), {'id', 'nome', 'telefone', 'ultima_visita', 'total_sessoes', 'status'})
+
+    def test_detalhe_continua_completo_para_o_formulario(self):
+        paciente = self.client.get(f'/api/pacientes/{self.id}/').data
+
+        self.assertEqual(paciente['historico_medico'], 'Hérnia de disco L5-S1')
+        self.assertEqual(paciente['endereco'], 'Rua A, 10')
+        self.assertEqual(paciente['cpf'], '111.111.111-11')

@@ -68,18 +68,50 @@ class FotoPerfilAPITestCase(TestCase):
         self.profissional.refresh_from_db()
         self.assertTrue(self.profissional.foto.storage.exists(self.profissional.foto.name))
         # Nome aleatório, sem o nome original do arquivo
-        self.assertRegex(self.profissional.foto.name, r'^perfis/[0-9a-f]{32}\.png$')
+        self.assertRegex(self.profissional.foto.name, r'^perfis/[0-9a-f]{32}\.webp$')
         self.assertTrue(response.data['foto'].startswith('http://testserver/media/perfis/'))
 
         perfil = self.client.get('/api/auth/me/')
         self.assertEqual(perfil.data['foto'], response.data['foto'])
 
-    def test_extensao_segue_formato_real(self):
-        # PNG enviado com extensão .jpg é salvo como .png
-        self.client.post(self.url, {'foto': gerar_imagem('PNG', nome='foto.jpg')}, format='multipart')
-
+    def enviar_e_abrir(self, arquivo):
+        self.assertEqual(self.client.post(self.url, {'foto': arquivo}, format='multipart').status_code, status.HTTP_200_OK)
         self.profissional.refresh_from_db()
-        self.assertTrue(self.profissional.foto.name.endswith('.png'))
+        with self.profissional.foto.open('rb') as salvo:
+            imagem = Image.open(salvo)
+            imagem.load()
+        return imagem
+
+    def test_salva_sempre_em_webp(self):
+        imagem = self.enviar_e_abrir(gerar_imagem('JPEG', nome='foto.jpg'))
+
+        self.assertEqual(imagem.format, 'WEBP')
+        self.assertTrue(self.profissional.foto.name.endswith('.webp'))
+
+    def test_reduz_para_no_maximo_256px_mantendo_a_proporcao(self):
+        self.assertEqual(self.enviar_e_abrir(gerar_imagem(tamanho=(1000, 600))).size, (256, 154))
+
+    def test_imagem_pequena_nao_e_ampliada(self):
+        self.assertEqual(self.enviar_e_abrir(gerar_imagem(tamanho=(40, 30))).size, (40, 30))
+
+    def test_remove_os_metadados_exif(self):
+        exif = Image.Exif()
+        exif[0x010F] = 'Celular de teste'  # Make
+        exif[0x8825] = {2: (23.0, 33.0, 0.0)}  # GPSInfo: latitude
+        buffer = io.BytesIO()
+        Image.new('RGB', (50, 50), 'blue').save(buffer, format='JPEG', exif=exif)
+        arquivo = SimpleUploadedFile('foto.jpg', buffer.getvalue(), content_type='image/jpeg')
+
+        self.assertEqual(dict(self.enviar_e_abrir(arquivo).getexif()), {})
+
+    def test_gira_conforme_a_orientacao_do_exif(self):
+        exif = Image.Exif()
+        exif[0x0112] = 6  # Orientation: girar 90° (foto de celular "deitada")
+        buffer = io.BytesIO()
+        Image.new('RGB', (80, 40), 'blue').save(buffer, format='JPEG', exif=exif)
+        arquivo = SimpleUploadedFile('foto.jpg', buffer.getvalue(), content_type='image/jpeg')
+
+        self.assertEqual(self.enviar_e_abrir(arquivo).size, (40, 80))
 
     def test_sem_arquivo(self):
         response = self.client.post(self.url, {}, format='multipart')
@@ -438,26 +470,102 @@ class CadastroComCodigoAPITestCase(TestCase):
         self.assertFalse(User.objects.filter(username='dr_novo').exists())
 
 
-class EmailUnicoNoPerfilAPITestCase(TestCase):
+class TrocaDeEmailAPITestCase(TestCase):
+    SENHA = 'SenhaForte123'
+
     def setUp(self):
+        cache.clear()
         User.objects.create_user(username='outro', email='ocupado@exemplo.com', password='x')
-        self.user = User.objects.create_user(username='dr_silva', email='joao@exemplo.com', password='x')
+        self.user = User.objects.create_user(username='dr_silva', email='joao@exemplo.com', password=self.SENHA)
         Profissional.objects.create(usuario=self.user, telefone='1', especialidade='x', crefito='12345-F')
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
+    def solicitar(self, email='novo@exemplo.com', senha=None):
+        return self.client.post('/api/auth/me/email/', {'email': email, 'senha_atual': senha or self.SENHA})
+
+    def confirmar(self, codigo, email='novo@exemplo.com', client=None):
+        return (client or self.client).post('/api/auth/me/email/confirmar/', {'email': email, 'codigo': codigo})
+
+    def codigo_enviado(self):
+        return re.search(r'\b(\d{6})\b', mail.outbox[-1].body).group(1)
+
+    def email_atual(self):
+        self.user.refresh_from_db()
+        return self.user.email
+
+    def test_patch_do_perfil_nao_troca_o_email(self):
+        response = self.client.patch('/api/auth/me/', {'email': 'novo@exemplo.com'})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Alterar e-mail', response.data['email'][0])
+        self.assertEqual(self.email_atual(), 'joao@exemplo.com')
+
+    def test_patch_com_o_mesmo_email_continua_aceito(self):
+        self.assertEqual(self.client.patch('/api/auth/me/', {'email': 'JOAO@exemplo.com'}).status_code, status.HTTP_200_OK)
+
+    def test_fluxo_completo_envia_codigo_ao_novo_email_e_avisa_o_antigo(self):
+        self.assertEqual(self.solicitar('Novo@Exemplo.com ').status_code, status.HTTP_200_OK)
+        self.assertEqual(mail.outbox[0].to, ['novo@exemplo.com'])
+        self.assertEqual(self.email_atual(), 'joao@exemplo.com')
+
+        response = self.confirmar(self.codigo_enviado())
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['email'], 'novo@exemplo.com')
+        self.assertEqual(self.email_atual(), 'novo@exemplo.com')
+        self.assertEqual(mail.outbox[-1].to, ['joao@exemplo.com'])
+        self.assertIn('novo@exemplo.com', mail.outbox[-1].body)
+
+    def test_exige_a_senha_atual(self):
+        response = self.solicitar(senha='errada')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['senha_atual'], ['Senha atual incorreta.'])
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_nao_permite_email_de_outra_conta(self):
-        response = self.client.patch('/api/auth/me/', {'email': 'OCUPADO@exemplo.com'})
+        response = self.solicitar('OCUPADO@exemplo.com')
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['email'], ['Este e-mail já está em uso.'])
 
-    def test_permite_manter_o_proprio_email(self):
-        response = self.client.patch('/api/auth/me/', {'email': 'JOAO@exemplo.com'})
+    def test_nao_permite_o_proprio_email(self):
+        self.assertEqual(self.solicitar('joao@exemplo.com').data['email'], ['Este já é o e-mail da sua conta.'])
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.user.refresh_from_db()
-        self.assertEqual(self.user.email, 'joao@exemplo.com')
+    def test_codigo_errado_nao_troca(self):
+        self.solicitar()
+
+        response = self.confirmar('000000' if self.codigo_enviado() != '000000' else '111111')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.email_atual(), 'joao@exemplo.com')
+
+    def test_codigo_de_um_usuario_nao_serve_para_outro(self):
+        self.solicitar()
+        codigo = self.codigo_enviado()
+        outro = User.objects.get(username='outro')
+        Profissional.objects.create(usuario=outro, telefone='1', especialidade='x', crefito='999-F')
+        client_outro = APIClient()
+        client_outro.force_authenticate(user=outro)
+
+        self.assertEqual(self.confirmar(codigo, client=client_outro).status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_codigo_de_troca_nao_serve_para_cadastro(self):
+        self.solicitar()
+
+        self.assertFalse(CodigoVerificacaoEmail.verificar('novo@exemplo.com', self.codigo_enviado()))
+
+    def test_reenvio_so_depois_de_60_segundos(self):
+        self.solicitar()
+
+        response = self.solicitar()
+
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertIn('aguardar_segundos', response.data)
+
+    def test_exige_login(self):
+        self.assertEqual(APIClient().post('/api/auth/me/email/', {}).status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class BaseDadosDaContaTestCase(TestCase):

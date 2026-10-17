@@ -72,3 +72,9 @@ class PacienteSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({'email': ['Já existe um paciente cadastrado com este e-mail.']})
 
         return super().validate(attrs)
+
+
+class PacienteListaSerializer(PacienteSerializer):
+    
+    class Meta(PacienteSerializer.Meta):
+        fields = ['id', 'nome', 'telefone', 'ultima_visita', 'total_sessoes', 'status']

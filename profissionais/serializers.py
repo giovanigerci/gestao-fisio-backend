@@ -1,5 +1,9 @@
+import io
+
+from PIL import Image, ImageOps
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
+from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from rest_framework import serializers
@@ -104,8 +108,11 @@ class PerfilSerializer(serializers.Serializer):
 
     def validate_email(self, value):
         value = value.strip().lower()
-        if value:
-            validar_email_unico(value, excluir_usuario=self.instance.usuario if self.instance else None)
+        atual = (self.instance.usuario.email or '').lower() if self.instance else ''
+        if value != atual:
+            raise serializers.ValidationError(
+                'Para trocar o e-mail, use "Alterar e-mail": o novo endereço é confirmado por um código.'
+            )
         return value
 
     def validate_crefito(self, value):
@@ -147,7 +154,8 @@ class PerfilSerializer(serializers.Serializer):
 
 class FotoPerfilSerializer(serializers.Serializer):
     TAMANHO_MAXIMO = 5 * 1024 * 1024  # 5 MB
-    FORMATOS_PERMITIDOS = {'JPEG': '.jpg', 'PNG': '.png', 'WEBP': '.webp'}
+    FORMATOS_PERMITIDOS = {'JPEG', 'PNG', 'WEBP'}
+    LADO_MAXIMO = 256
 
     foto = serializers.ImageField(error_messages={
         'required': 'Nenhum arquivo enviado.',
@@ -163,8 +171,18 @@ class FotoPerfilSerializer(serializers.Serializer):
         if formato not in self.FORMATOS_PERMITIDOS:
             raise serializers.ValidationError('Formato não suportado. Envie uma imagem JPEG, PNG ou WEBP.')
 
-        value.name = f'foto{self.FORMATOS_PERMITIDOS[formato]}'
-        return value
+        return self._recriar(value)
+
+    def _recriar(self, arquivo):
+        """Imagem nova, sem os metadados do original (o EXIF pode trazer a localização onde a foto foi tirada)."""
+        arquivo.seek(0)
+        with Image.open(arquivo) as original:
+            imagem = ImageOps.exif_transpose(original)
+            imagem.thumbnail((self.LADO_MAXIMO, self.LADO_MAXIMO))
+            imagem = imagem.convert('RGBA' if imagem.mode in ('RGBA', 'LA', 'P') else 'RGB')
+            saida = io.BytesIO()
+            imagem.save(saida, format='WEBP', quality=85)
+        return ContentFile(saida.getvalue(), name='foto.webp')
 
 class TrocarSenhaSerializer(serializers.Serializer):
     senha_atual = serializers.CharField(write_only=True, max_length=MAX_SENHA)
@@ -193,6 +211,40 @@ class RedefinirSenhaSerializer(serializers.Serializer):
             raise serializers.ValidationError({'confirmar_senha': 'As senhas não coincidem.'})
 
         validar_senha(data['nova_senha'], self.context.get('user'), 'nova_senha')
+        return data
+
+
+class SolicitarTrocaEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    senha_atual = serializers.CharField(write_only=True, max_length=MAX_SENHA)
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        usuario = self.context['request'].user
+        if value == (usuario.email or '').lower():
+            raise serializers.ValidationError('Este já é o e-mail da sua conta.')
+        validar_email_unico(value, excluir_usuario=usuario)
+        return value
+
+    def validate_senha_atual(self, value):
+        if not self.context['request'].user.check_password(value):
+            raise serializers.ValidationError('Senha atual incorreta.')
+        return value
+
+
+class ConfirmarTrocaEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    codigo = serializers.RegexField(r'^\d{6}$', error_messages={'invalid': 'O código deve ter 6 dígitos.'})
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        validar_email_unico(value, excluir_usuario=self.context['request'].user)
+        return value
+
+    def validate(self, data):
+        finalidade = CodigoVerificacaoEmail.troca_de_email(self.context['request'].user)
+        if not CodigoVerificacaoEmail.verificar(data['email'], data['codigo'], finalidade):
+            raise serializers.ValidationError({'codigo': 'Código inválido ou expirado.'})
         return data
 
 

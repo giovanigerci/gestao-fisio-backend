@@ -1,0 +1,10 @@
+{% extends "emails/base.txt" %}
+{% block conteudo %}Confirme seu novo e-mail
+
+Use o código abaixo para confirmar este endereço como o novo e-mail da sua conta no Gestão Fisio:
+
+{{ codigo }}
+
+O código vale por {{ validade_minutos }} minutos.
+
+Se você não pediu essa troca, ignore este e-mail — o e-mail da conta não muda.{% endblock %}

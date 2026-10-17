@@ -6,7 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from agenda.models import Agendamento
 from .models import Paciente
-from .serializers import PacienteSerializer
+from .serializers import PacienteListaSerializer, PacienteSerializer
 
 class PacienteViewSet(viewsets.ModelViewSet):
     serializer_class = PacienteSerializer
@@ -14,6 +14,9 @@ class PacienteViewSet(viewsets.ModelViewSet):
     search_fields = ['nome__unaccent']
     ordering_fields = ['nome']
     ordering = ['nome']
+
+    def get_serializer_class(self):
+        return PacienteListaSerializer if self.action == 'list' else PacienteSerializer
 
     def get_queryset(self):
         hoje = timezone.localdate()

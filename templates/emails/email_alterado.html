@@ -1,0 +1,15 @@
+{% extends "emails/base.html" %}
+
+{% block titulo %}O e-mail da sua conta foi alterado — Gestão Fisio{% endblock %}
+
+{% block preheader %}O e-mail de acesso da sua conta agora é {{ email_novo }}.{% endblock %}
+
+{% block conteudo %}
+<p style="margin:0 0 16px; font-size:20px; font-weight:bold; color:#0f172a;">O e-mail da sua conta foi alterado</p>
+
+<p style="margin:0 0 16px;">O e-mail de acesso da sua conta no Gestão Fisio agora é <strong>{{ email_novo }}</strong>. Os avisos e a recuperação de senha passam a ir para esse endereço.</p>
+
+<p style="margin:0 0 16px;">Se foi você, não precisa fazer nada.</p>
+
+<p style="margin:0; font-size:14px; color:#475569;">Se não foi você, escreva agora para <a href="mailto:contato@gestao-fisio.com" style="color:#2563eb;">contato@gestao-fisio.com</a>.</p>
+{% endblock %}

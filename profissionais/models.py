@@ -33,8 +33,10 @@ class CodigoVerificacaoEmail(models.Model):
     VALIDADE = timedelta(minutes=10)
     MAX_TENTATIVAS = 5
     INTERVALO_REENVIO = timedelta(seconds=60)
+    CADASTRO = 'cadastro'
 
     email = models.EmailField(db_index=True)
+    finalidade = models.CharField(max_length=40, default=CADASTRO)
     codigo_hash = models.CharField(max_length=64)
     tentativas = models.PositiveSmallIntegerField(default=0)
     criado_em = models.DateTimeField(auto_now_add=True)
@@ -44,27 +46,36 @@ class CodigoVerificacaoEmail(models.Model):
         verbose_name_plural = 'Códigos de verificação de e-mail'
 
     @staticmethod
+    def troca_de_email(usuario):
+        """Finalidade do código que confirma o novo e-mail: só vale para este usuário."""
+        return f'troca_email:{usuario.pk}'
+
+    @staticmethod
     def _hash(email, codigo):
         return salted_hmac('profissionais.CodigoVerificacaoEmail', f'{email.lower()}:{codigo}').hexdigest()
 
     @classmethod
-    def gerar(cls, email):
+    def _do_email(cls, email, finalidade):
+        return cls.objects.filter(email__iexact=email, finalidade=finalidade)
+
+    @classmethod
+    def gerar(cls, email, finalidade=CADASTRO):
         codigo = f'{secrets.randbelow(10**6):06d}'
-        cls.objects.filter(email__iexact=email).delete()
-        cls.objects.create(email=email.lower(), codigo_hash=cls._hash(email, codigo))
+        cls._do_email(email, finalidade).delete()
+        cls.objects.create(email=email.lower(), finalidade=finalidade, codigo_hash=cls._hash(email, codigo))
         return codigo
 
     @classmethod
-    def segundos_para_reenvio(cls, email):
-        ultimo = cls.objects.filter(email__iexact=email).order_by('-criado_em').first()
+    def segundos_para_reenvio(cls, email, finalidade=CADASTRO):
+        ultimo = cls._do_email(email, finalidade).order_by('-criado_em').first()
         if not ultimo:
             return 0
         restante = ultimo.criado_em + cls.INTERVALO_REENVIO - timezone.now()
         return max(0, math.ceil(restante.total_seconds()))
 
     @classmethod
-    def verificar(cls, email, codigo):
-        registro = cls.objects.filter(email__iexact=email).order_by('-criado_em').first()
+    def verificar(cls, email, codigo, finalidade=CADASTRO):
+        registro = cls._do_email(email, finalidade).order_by('-criado_em').first()
         if not registro or registro.expirado or registro.tentativas >= cls.MAX_TENTATIVAS:
             return False
 
