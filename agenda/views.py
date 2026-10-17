@@ -1,42 +1,50 @@
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import viewsets, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.validators import UniqueTogetherValidator
 from .models import Agendamento
 from .serializers import AgendamentoSerializer, VerificarRecorrenciaSerializer
 
+MAX_DIAS_PERIODO = 93
+
+
 class AgendamentoViewSet(viewsets.ModelViewSet):
     serializer_class = AgendamentoSerializer
+
+    def periodo(self):
+        inicio, fim = self.request.query_params.get('data_inicio'), self.request.query_params.get('data_fim')
+        if not (inicio and fim):
+            return None
+        try:
+            inicio, fim = date.fromisoformat(inicio), date.fromisoformat(fim)
+        except ValueError:
+            raise ValidationError({'data': 'Datas inválidas. Use o formato AAAA-MM-DD.'})
+        if inicio > fim or (fim - inicio).days > MAX_DIAS_PERIODO:
+            raise ValidationError({'data': f'Use um período de até {MAX_DIAS_PERIODO} dias, com o início antes do fim.'})
+        return inicio, fim
 
     def get_queryset(self):
         queryset = Agendamento.objects.filter(
             profissional=self.request.user.profissional
         ).select_related('paciente', 'clinica').order_by('data', 'hora_inicio', 'id')
 
-        data_inicio = self.request.query_params.get('data_inicio')
-        data_fim = self.request.query_params.get('data_fim')
-
-        if data_inicio and data_fim:
-            queryset = queryset.filter(data__gte=data_inicio, data__lte=data_fim)
-        
+        periodo = self.periodo()
+        if periodo:
+            queryset = queryset.filter(data__range=periodo)
         return queryset
 
     def perform_create(self, serializer):
         serializer.save(profissional=self.request.user.profissional)
 
     def list(self, request, *args, **kwargs):
-        data_inicio = request.query_params.get('data_inicio')
-        data_fim = request.query_params.get('data_fim')
-
-        if data_inicio and data_fim:
-            queryset = self.filter_queryset(self.get_queryset())
-            serializer = self.get_serializer(queryset, many=True)
+        if self.periodo():
+            serializer = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True)
             return Response(serializer.data)
-        
         return super().list(request, *args, **kwargs)
     
     @action(detail=False, methods=['post'])

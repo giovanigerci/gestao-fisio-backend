@@ -38,3 +38,30 @@ class HealthCheckAPITestCase(TestCase):
         response = self.client.post(self.url)
 
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+class VerificarOrigemTestCase(TestCase):
+    URL = '/api/auth/logout/'
+
+    def enviar(self, metodo='post', **cabecalhos):
+        return getattr(APIClient(), metodo)(self.URL, **cabecalhos)
+
+    def test_recusa_alteracao_vinda_de_outra_origem(self):
+        resposta = self.enviar(HTTP_ORIGIN='https://outro.gestao-fisio.com')
+
+        self.assertEqual(resposta.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(resposta.json(), {'detail': 'Origem não permitida.'})
+
+    def test_aceita_a_origem_do_front(self):
+        self.assertEqual(self.enviar(HTTP_ORIGIN='http://localhost:4200').status_code, status.HTTP_200_OK)
+
+    def test_aceita_o_proprio_host_da_api(self):
+        self.assertEqual(self.enviar(HTTP_ORIGIN='http://testserver').status_code, status.HTTP_200_OK)
+
+    def test_sem_origin_passa(self):
+        self.assertEqual(self.enviar().status_code, status.HTTP_200_OK)
+
+    def test_leitura_de_outra_origem_nao_e_bloqueada_aqui(self):
+        resposta = APIClient().get('/api/health/', HTTP_ORIGIN='https://outro.gestao-fisio.com')
+
+        self.assertEqual(resposta.status_code, status.HTTP_200_OK)

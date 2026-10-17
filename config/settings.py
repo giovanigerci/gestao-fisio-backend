@@ -16,6 +16,8 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='', cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
 
+ADMIN_ATIVO = config('ADMIN_ATIVO', default=True, cast=bool)
+
 
 # Application definition
 
@@ -43,6 +45,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'config.middleware.VerificarOrigemMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -148,6 +151,7 @@ REST_FRAMEWORK = {
         'login_conta': '10/hour',
         'registro': '5/minute',
         'codigo_email': '10/hour',
+        'confirmar_email': '20/hour',
         'password_reset': '3/hour',
         'redefinir_senha': '10/hour',
         'trocar_senha': '10/hour',

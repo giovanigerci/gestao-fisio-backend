@@ -6,7 +6,6 @@ from django.conf.urls.static import static
 from .views import HealthCheckView
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
     path('api/health/', HealthCheckView.as_view(), name='health'),
     path('api/', include('agenda.urls')),
     path('api/', include('clinicas.urls')),
@@ -16,5 +15,8 @@ urlpatterns = [
     path('api/auth/token/', LoginCookieView.as_view(), name='token_obtain_pair'),
     path('api/auth/token/refresh/', RefreshCookieView.as_view(), name='token_refresh'),
 ]
+
+if settings.ADMIN_ATIVO:
+    urlpatterns.append(path('admin/', admin.site.urls))
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

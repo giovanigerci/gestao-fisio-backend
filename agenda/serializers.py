@@ -1,5 +1,6 @@
 from django.utils import timezone
 from rest_framework import serializers
+from clinicas.models import Clinica
 from pacientes.models import Paciente
 from .models import Agendamento
 
@@ -17,6 +18,14 @@ class AgendamentoSerializer(serializers.ModelSerializer):
                    'nome_paciente', 'nome_clinica', 'cor_clinica', 'idade_paciente']
         read_only_fields = ['profissional']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get('request')
+        if request and hasattr(request.user, 'profissional'):
+            profissional = request.user.profissional
+            self.fields['clinica'].queryset = Clinica.objects.filter(profissional=profissional)
+            self.fields['paciente'].queryset = Paciente.objects.filter(profissional=profissional)
+
     def get_idade_paciente(self, obj):
         if obj.paciente and obj.paciente.data_nascimento:
             hoje = timezone.localdate()
@@ -31,19 +40,6 @@ class AgendamentoSerializer(serializers.ModelSerializer):
         if obj.eh_experimental:
             return 0
         return obj.clinica.valor_por_atendimento
-
-    def validate(self, dados):
-        profissional = self.context['request'].user.profissional
-
-        clinica = dados.get('clinica')
-        if clinica and clinica.profissional != profissional:
-            raise serializers.ValidationError("Você não pode agendar em uma clínica que não pertence a você.")
-
-        paciente = dados.get('paciente')
-        if paciente and paciente.profissional != profissional:
-            raise serializers.ValidationError("Você não pode agendar um paciente que não pertence a você.")
-
-        return dados
 
 
 class VerificarRecorrenciaSerializer(serializers.Serializer):

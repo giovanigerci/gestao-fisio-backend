@@ -404,3 +404,62 @@ class VerificarRecorrenciaTestCase(TestCase):
         self.assertEqual(self.verificar(repeticoes=0).status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.verificar(data='05/10/2026').status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(self.client.get(self.URL).status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class AgendaEntreContasEPeriodoTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='dr_silva', password='password123')
+        self.profissional = Profissional.objects.create(usuario=self.user, telefone='1', especialidade='x', crefito='111-F')
+        outro = Profissional.objects.create(
+            usuario=User.objects.create_user(username='dr_santos', password='password123'),
+            telefone='1', especialidade='x', crefito='222-F',
+        )
+        self.clinica = Clinica.objects.create(profissional=self.profissional, nome='A', endereco='Rua', valor_por_atendimento=100)
+        self.paciente = Paciente.objects.create(profissional=self.profissional, nome='Maria', cpf='1', telefone='1')
+        self.clinica_alheia = Clinica.objects.create(profissional=outro, nome='B', endereco='Rua', valor_por_atendimento=100)
+        self.paciente_alheio = Paciente.objects.create(profissional=outro, nome='Joana', cpf='2', telefone='1')
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def agendar(self, clinica, paciente):
+        return self.client.post('/api/agendamentos/', {
+            'clinica': clinica, 'paciente': paciente, 'data': '2026-11-10', 'hora_inicio': '08:00', 'hora_fim': '09:00',
+        })
+
+    def test_paciente_de_outra_conta_recebe_a_mesma_resposta_de_um_id_inexistente(self):
+        alheio = self.agendar(self.clinica.pk, self.paciente_alheio.pk)
+        inexistente = self.agendar(self.clinica.pk, 999999)
+
+        self.assertEqual(alheio.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            str(alheio.data['paciente'][0]).replace(str(self.paciente_alheio.pk), 'X'),
+            str(inexistente.data['paciente'][0]).replace('999999', 'X'),
+        )
+
+    def test_clinica_de_outra_conta_e_recusada(self):
+        resposta = self.agendar(self.clinica_alheia.pk, self.paciente.pk)
+
+        self.assertEqual(resposta.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('clinica', resposta.data)
+        self.assertFalse(Agendamento.objects.exists())
+
+    def test_agenda_da_propria_conta_funciona(self):
+        self.assertEqual(self.agendar(self.clinica.pk, self.paciente.pk).status_code, status.HTTP_201_CREATED)
+
+    def listar(self, inicio, fim):
+        return self.client.get('/api/agendamentos/', {'data_inicio': inicio, 'data_fim': fim})
+
+    def test_semana_valida(self):
+        self.assertEqual(self.listar('2026-11-08', '2026-11-14').status_code, status.HTTP_200_OK)
+
+    def test_data_invalida_e_400_e_nao_500(self):
+        resposta = self.listar('abc', '2026-11-14')
+
+        self.assertEqual(resposta.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('AAAA-MM-DD', str(resposta.data['data']))
+
+    def test_inicio_depois_do_fim_e_recusado(self):
+        self.assertEqual(self.listar('2026-11-14', '2026-11-08').status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_periodo_longo_demais_e_recusado(self):
+        self.assertEqual(self.listar('2026-01-01', '2026-12-31').status_code, status.HTTP_400_BAD_REQUEST)
