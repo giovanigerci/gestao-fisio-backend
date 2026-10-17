@@ -50,11 +50,6 @@ class LoginCookieView(TokenObtainPairView):
     throttle_scope = 'login'
 
     def post(self, request, *args, **kwargs):
-        logger.warning(
-            'Diagnóstico de IP (temporário): X-Forwarded-For=%r REMOTE_ADDR=%r CF-Connecting-IP=%r True-Client-IP=%r',
-            request.META.get('HTTP_X_FORWARDED_FOR'), request.META.get('REMOTE_ADDR'),
-            request.META.get('HTTP_CF_CONNECTING_IP'), request.META.get('HTTP_TRUE_CLIENT_IP'),
-        )
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
