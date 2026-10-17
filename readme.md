@@ -254,7 +254,7 @@ Todas as variáveis estão documentadas em `.env.example`. As principais:
 | `CORS_ALLOWED_ORIGINS`| —           | Origens permitidas para CORS (padrão: `http://localhost:4200`) |
 | `COOKIE_SECURE`       | —           | `True` em produção com HTTPS, `False` em dev         |
 | `COOKIE_DOMAIN`       | —           | Domínio dos cookies antigos, só para apagá-los até 2026-11-16 (os novos valem apenas para o host da API) |
-| `NUM_PROXIES`         | ✅ (produção) | Quantos proxies acrescentam o `X-Forwarded-For` na frente da API (identifica o IP real nos limites de tentativas) |
+| `NUM_PROXIES`         | ✅ (produção) | Quantos proxies acrescentam o `X-Forwarded-For` na frente da API (identifica o IP real nos limites de tentativas). No Render: `3` (Cloudflare, balanceador e proxy local) |
 | `ADMIN_ATIVO`         | —           | `False` desliga o Django Admin (`/admin/`); recomendado em produção se ele não for usado (padrão: `True`) |
 | `FRONTEND_URL`        | —           | URL do frontend para links de e-mail (padrão: `http://localhost:4200`) |
 | `EMAIL_BACKEND`       | ✅ (produção) | Backend de e-mail (padrão: `console` — imprime no terminal, não envia nada). Em produção: `django.core.mail.backends.smtp.EmailBackend` |
