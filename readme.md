@@ -250,7 +250,7 @@ Todas as variáveis estão documentadas em `.env.example`. As principais:
 | `POSTGRES_USER`       | ✅ (local)  | Usuário do PostgreSQL                                |
 | `POSTGRES_PASSWORD`   | ✅ (local)  | Senha do PostgreSQL                                  |
 | `POSTGRES_HOST`       | —           | Host do banco (padrão: `localhost`)                  |
-| `DATABASE_URL`        | ✅ (produção) | URL completa do banco — substitui as vars `POSTGRES_*` se definida |
+| `DATABASE_URL`        | ✅ (produção) | URL completa do banco — substitui as vars `POSTGRES_*` se definida. Por desempenho, o banco fica na mesma região do backend: hoje, Neon em `us-east-1` (Virginia), junto com o Render. Em regiões diferentes funciona, mas cada consulta atravessa o continente e as requisições ficam de 3 a 5 vezes mais lentas. O Neon roda Postgres 18; backups com `pg_dump` precisam da versão 18 |
 | `CORS_ALLOWED_ORIGINS`| —           | Origens permitidas para CORS (padrão: `http://localhost:4200`) |
 | `COOKIE_SECURE`       | —           | `True` em produção com HTTPS, `False` em dev         |
 | `COOKIE_DOMAIN`       | —           | Domínio dos cookies antigos, só para apagá-los até 2026-11-16 (os novos valem apenas para o host da API) |
