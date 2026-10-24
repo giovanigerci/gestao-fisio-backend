@@ -249,3 +249,25 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 EMAIL_TIMEOUT = config('EMAIL_TIMEOUT', default=10, cast=int)
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Gestão Fisio <nao-responda@gestao-fisio.com>')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'debug_ligado': {'()': 'django.utils.log.RequireDebugTrue'},
+        'debug_desligado': {'()': 'django.utils.log.RequireDebugFalse'},
+    },
+    'formatters': {
+        'erro': {'format': '{levelname} {name}: {message}', 'style': '{'},
+        'django.server': {'()': 'django.utils.log.ServerFormatter', 'format': '[{server_time}] {message}', 'style': '{'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'level': 'INFO', 'filters': ['debug_ligado']},
+        'erros': {'class': 'logging.StreamHandler', 'level': 'ERROR', 'filters': ['debug_desligado'], 'formatter': 'erro'},
+        'django.server': {'class': 'logging.StreamHandler', 'level': 'INFO', 'formatter': 'django.server'},
+    },
+    'loggers': {
+        'django': {'handlers': ['console', 'erros'], 'level': 'INFO'},
+        'django.server': {'handlers': ['django.server'], 'level': 'INFO', 'propagate': False},
+    },
+}

@@ -402,7 +402,8 @@ class CadastroComCodigoAPITestCase(TestCase):
 
     def test_falha_no_envio_remove_o_codigo_para_tentar_de_novo(self):
         with patch('profissionais.views.send_mail', side_effect=smtplib.SMTPException('fora do ar')), \
-                self.assertLogs('profissionais.views', level='ERROR'):
+                self.assertLogs('profissionais.views', level='ERROR'), \
+                self.assertLogs('django.request', level='ERROR'):
             response = self.enviar_codigo()
 
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)

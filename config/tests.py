@@ -1,6 +1,42 @@
+import io
+import logging
+from contextlib import ExitStack
+from unittest.mock import patch
+
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
+
+from config.views import HealthCheckView
+
+
+class LogDeErrosTestCase(TestCase):
+    """Os testes rodam com DEBUG=False, como em produção."""
+
+    def requisitar_capturando_log(self, url, **patches):
+        saida = io.StringIO()
+        client = APIClient(raise_request_exception=False)
+        manipuladores = [h for h in logging.getLogger('django').handlers if isinstance(h, logging.StreamHandler)]
+        with ExitStack() as pilha:
+            for manipulador in manipuladores:
+                pilha.enter_context(patch.object(manipulador, 'stream', saida))
+            for alvo, efeito in patches.items():
+                pilha.enter_context(patch.object(HealthCheckView, alvo, side_effect=efeito))
+            resposta = client.get(url)
+        return resposta, saida.getvalue()
+
+    def test_erro_500_aparece_no_log_com_o_traceback(self):
+        resposta, log = self.requisitar_capturando_log('/api/health/', get=RuntimeError('falha simulada'))
+
+        self.assertEqual(resposta.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertIn('Internal Server Error: /api/health/', log)
+        self.assertIn('RuntimeError: falha simulada', log)
+
+    def test_respostas_4xx_nao_poluem_o_log(self):
+        resposta, log = self.requisitar_capturando_log('/api/auth/me/')
+
+        self.assertEqual(resposta.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(log, '')
 
 
 class HealthCheckAPITestCase(TestCase):
